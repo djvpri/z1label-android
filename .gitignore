@@ -1,0 +1,13 @@
+# build
+/app/build/
+/app/release/
+*.apk
+*.aab
+local.properties
+.kotlin/
+.gradle/
+.idea/
+build/
+captures/
+.externalNativeBuild/
+.cxx/

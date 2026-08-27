@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.checkbox.MaterialCheckBox
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/chk"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="12dp"
+    android:minHeight="0dp"
+    android:gravity="start|center_vertical"
+    android:text="Produk"
+    android:textSize="15sp" />
