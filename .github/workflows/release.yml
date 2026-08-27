@@ -1,0 +1,57 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versi rilis (mis. 1.1.0) — harus naik dari yg ada'
+        required: true
+        default: '1.1.0'
+      changelog:
+        description: 'Catatan rilis'
+        required: false
+        default: ''
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Write keystore (dari secret)
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_B64 }}" | base64 -d > keystore.jks
+        env:
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+
+      - name: Build signed APK (versi ${{ inputs.version }})
+        run: |
+          sed -i "s/versionName = .*/versionName = \"${{ inputs.version }}\"/" app/build.gradle.kts
+          # bump versionCode otomatis (dari tanggal)
+          VC=$(date +%Y%m%d)
+          sed -i "s/versionCode = [0-9]*/versionCode = $VC/" app/build.gradle.kts
+          ./gradlew :app:assembleRelease --no-daemon
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEYSTORE_ALIAS: ${{ secrets.ANDROID_KEYSTORE_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+      - name: Buat rilis GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: Z1 Label v${{ inputs.version }}
+          body: ${{ inputs.changelog }}
+          files: app/build/outputs/apk/release/app-release.apk
+          generate_release_notes: true

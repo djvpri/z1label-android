@@ -17,9 +17,23 @@ android {
         versionName = "1.0.0"
     }
 
+    signingConfigs {
+        getByName("release") {
+            val ks = System.getenv("KEYSTORE_B64")
+            if (!ks.isNullOrEmpty()) {
+                storeFile = rootProject.file("keystore.jks")
+                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: ""
+                keyAlias = System.getenv("KEYSTORE_ALIAS") ?: ""
+                keyPassword = System.getenv("KEY_PASSWORD") ?: ""
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = if (System.getenv("KEYSTORE_B64").isNullOrEmpty())
+                null else signingConfigs.getByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -35,6 +49,7 @@ android {
 
     buildFeatures {
         viewBinding = true
+        buildConfig = true
     }
 }
 

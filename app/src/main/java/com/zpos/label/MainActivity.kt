@@ -25,6 +25,7 @@ import com.zpos.label.bt.BluetoothPrinter
 import com.zpos.label.databinding.ActivityMainBinding
 import com.zpos.label.databinding.ItemProdukBinding
 import com.zpos.label.escpos.EscPosLabel
+import com.zpos.label.update.Updater
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -75,6 +76,7 @@ class MainActivity : AppCompatActivity() {
         }
         b.btnPrinter.setOnClickListener { pilihPrinter() }
         b.btnCetak.setOnClickListener { cetak() }
+        b.btnCekUpdate.setOnClickListener { cekUpdate(otomatis = false) }
 
         val savedEmail = prefs.getString("email", "")
         if (savedEmail != null && savedEmail.isNotEmpty()) {
@@ -95,6 +97,43 @@ class MainActivity : AppCompatActivity() {
         b.loginView.visibility = View.GONE
         b.mainView.visibility = View.VISIBLE
         loadProduk()
+        cekUpdate(otomatis = true)
+    }
+
+    /** Cek versi rilis GitHub; kalau ada baru, tawarkan unduh-install. */
+    private fun cekUpdate(otomatis: Boolean) {
+        scope.launch {
+            val rilis = withContext(Dispatchers.IO) { Updater.cekTerbaru() } ?: run {
+                withContext(Dispatchers.Main) {
+                    if (!otomatis) b.lblStatus.text = "Gagal cek update / belum ada rilis"
+                }
+                return@launch
+            }
+            val cur = BuildConfig.VERSION_NAME
+            val adaBaru = Updater.lebihBaru(rilis.versi, cur)
+            withContext(Dispatchers.Main) {
+                if (!adaBaru) {
+                    if (!otomatis) b.lblStatus.text = "Sudah versi terbaru ($cur)"
+                    return@withContext
+                }
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle("Update tersedia")
+                    .setMessage("Versi ${rilis.versi} (sekarang $cur).\nDownload & install?")
+                    .setPositiveButton("Unduh") { _, _ ->
+                        val url = rilis.apkUrl
+                        if (url == null) { Toast.makeText(this@MainActivity, "APK tidak tersedia", Toast.LENGTH_SHORT).show() }
+                        else scope.launch {
+                            b.lblStatus.text = "Mengunduh APK..."
+                            val ok = Updater.unduhDanInstall(this@MainActivity, url)
+                            withContext(Dispatchers.Main) {
+                                b.lblStatus.text = if (ok) "Unduh selesai — install di sistem" else "Unduh gagal"
+                            }
+                        }
+                    }
+                    .setNegativeButton("Nanti", null)
+                    .show()
+            }
+        }
     }
 
     private fun doLogin() {
