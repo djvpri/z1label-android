@@ -16,7 +16,7 @@ android {
     }
 
     signingConfigs {
-        getByName("release") {
+        create("release") {
             val ks = System.getenv("KEYSTORE_B64")
             if (!ks.isNullOrEmpty()) {
                 storeFile = rootProject.file("keystore.jks")
