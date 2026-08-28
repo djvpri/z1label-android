@@ -66,7 +66,7 @@ object EscPosLabel {
         w: Int
     ) {
         val totalDot = (bc.totalModul + Code128.QUIET * 2) * 2 // modul=2 dot minimal
-        val scale = (w - (sc * 2)).coerceAtLeast(1).toFloat() / totalDot.toFloat()
+        val scale = (w - (sc * 2)).coerceAtLeast(1f).toFloat() / totalDot.toFloat()
         val leftPad = ((w - (bc.totalModul + Code128.QUIET * 2) * 2 * scale) / 2f)
         val top = labelH - heightPx - (sc * 1f).toInt()
         val paint = Paint().apply { color = Color.BLACK }
