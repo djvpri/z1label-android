@@ -2,6 +2,7 @@ package com.zpos.label
 
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
 import android.content.Context
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
