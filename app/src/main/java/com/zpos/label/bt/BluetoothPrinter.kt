@@ -3,7 +3,11 @@ package com.zpos.label.bt
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import androidx.core.content.ContextCompat
 import java.io.OutputStream
 import java.lang.reflect.Method
 import java.util.UUID
@@ -19,6 +23,38 @@ object BluetoothPrinter {
 
     @Volatile private var socket: BluetoothSocket? = null
     @Volatile private var out: OutputStream? = null
+
+    // device hasil discovery (di luar daftar bonded)
+    private val discovered = LinkedHashMap<String, BluetoothDevice>()
+    private var scanReceiver: BroadcastReceiver? = null
+    fun discoveredDevices(): List<BluetoothDevice> = discovered.values.toList()
+
+    /** Mulai discovery Bluetooth; setiap device ditemukan -> onUpdate() (untuk refresh UI). */
+    fun startScan(context: Context, onUpdate: () -> Unit) {
+        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return
+        if (scanReceiver != null) return // sudah jalan
+        discovered.clear()
+        scanReceiver = object : BroadcastReceiver() {
+            override fun onReceive(c: Context, i: Intent) {
+                if (i.action != BluetoothDevice.ACTION_FOUND) return
+                val d = i.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE) ?: return
+                discovered[d.address] = d
+                onUpdate()
+            }
+        }
+        ContextCompat.registerReceiver(
+            context, scanReceiver,
+            IntentFilter(BluetoothDevice.ACTION_FOUND),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        adapter.startDiscovery()
+    }
+
+    fun stopScan(context: Context) {
+        scanReceiver?.let { runCatching { context.unregisterReceiver(it) } }
+        scanReceiver = null
+        runCatching { BluetoothAdapter.getDefaultAdapter()?.cancelDiscovery() }
+    }
 
     fun pairedDevices(): List<BluetoothDevice> {
         val adapter = BluetoothAdapter.getDefaultAdapter() ?: return emptyList()

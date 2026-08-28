@@ -43,6 +43,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var adapter: ProdukAdapter
 
     private var printerAddress: String? = null
+    private var scanAktif = false
+    private var printerDialog: AlertDialog? = null
+    private var sortMode = "baru"          // "baru" (id turun) | "nama" (A-Z)
+    private var paperW = 25                 // mm, default 25x15
+    private var paperH = 15
 
     private val permReq =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { _ ->
@@ -56,6 +61,12 @@ class MainActivity : AppCompatActivity() {
 
         prefs = getSharedPreferences("z1label", Context.MODE_PRIVATE)
         printerAddress = prefs.getString("printer", null)
+        sortMode = prefs.getString("sort", "baru") ?: "baru"
+        val paper = (prefs.getString("paper", "25x15") ?: "25x15").split("x")
+        paperW = paper.getOrNull(0)?.toIntOrNull() ?: 25
+        paperH = paper.getOrNull(1)?.toIntOrNull() ?: 15
+        b.btnSort.text = if (sortMode == "baru") "Urut: Terbaru" else "Urut: Nama A-Z"
+        b.btnPaper.text = "Kertas ${paperW}x${paperH}"
         setPrinterLabel()
 
         adapter = ProdukAdapter { id ->
@@ -75,6 +86,8 @@ class MainActivity : AppCompatActivity() {
             showLogin()
         }
         b.btnPrinter.setOnClickListener { pilihPrinter() }
+        b.btnSort.setOnClickListener { pilihSort() }
+        b.btnPaper.setOnClickListener { pilihKertas() }
         b.btnCetak.setOnClickListener { cetak() }
         b.btnCekUpdate.setOnClickListener { cekUpdate(otomatis = false) }
 
@@ -178,28 +191,105 @@ class MainActivity : AppCompatActivity() {
 
     private fun filterList(q: String) {
         val t = q.trim().lowercase()
-        tampil = if (t.isEmpty()) semua.toMutableList()
+        val base = if (t.isEmpty()) semua.toMutableList()
         else semua.filter { it.nama.lowercase().contains(t) || (it.barcode?.contains(t) == true) }.toMutableList()
+        tampil = when (sortMode) {
+            "baru" -> base.sortedByDescending { it.id }      // id tinggi = dibuat baru
+            else -> base.sortedBy { it.nama.lowercase() }     // A-Z
+        }.toMutableList()
         adapter.submit(tampil)
+    }
+
+    /** Dialog pilihan urutan: Terbaru / Nama A-Z. */
+    private fun pilihSort() {
+        val opt = arrayOf("Terbaru", "Nama A-Z")
+        val cur = if (sortMode == "baru") 0 else 1
+        AlertDialog.Builder(this)
+            .setTitle("Urutkan Produk")
+            .setSingleChoiceItems(opt, cur) { d, i ->
+                sortMode = if (i == 0) "baru" else "nama"
+                prefs.edit().putString("sort", sortMode).apply()
+                b.btnSort.text = "Urut: " + opt[i]
+                filterList(b.txtCari.text.toString())
+                d.dismiss()
+            }
+            .setNegativeButton("Batal", null)
+            .show()
+    }
+
+    /** Dialog ukuran kertas label; disimpan utk cetak. */
+    private fun pilihKertas() {
+        val sizes = arrayOf(
+            "Label 25x15 mm", "Label 30x20 mm", "Label 40x20 mm", "Label 50x25 mm"
+        )
+        val vals = arrayOf("25x15", "30x20", "40x20", "50x25")
+        val cur = vals.indexOf("${paperW}x${paperH}").coerceAtLeast(0)
+        AlertDialog.Builder(this)
+            .setTitle("Ukuran Kertas Label")
+            .setSingleChoiceItems(sizes, cur) { d, i ->
+                val kv = vals[i].split("x")
+                paperW = kv[0].toInt(); paperH = kv[1].toInt()
+                prefs.edit().putString("paper", "${paperW}x${paperH}").apply()
+                b.btnPaper.text = "Kertas ${paperW}x${paperH}"
+                d.dismiss()
+            }
+            .setNegativeButton("Batal", null)
+            .show()
     }
 
     private fun pilihPrinter() {
         if (!bluetoothOk(true)) return
-        val devs = BluetoothPrinter.pairedDevices()
-        if (devs.isEmpty()) {
-            Toast.makeText(this, "Tidak ada printer Bluetooth terpasang", Toast.LENGTH_SHORT).show()
-            return
-        }
-        val names = devs.map { it.name + " (" + it.address + ")" }.toTypedArray()
-        AlertDialog.Builder(this)
-            .setTitle("Pilih Printer")
-            .setItems(names) { _, i ->
-                printerAddress = devs[i].address
-                prefs.edit().putString("printer", printerAddress).apply()
-                setPrinterLabel()
+        tampilDialogPrinter()
+    }
+
+    /** Dialog pilih printer tunggal: daftar terpasang + (kalau scan) hasil discovery. Di-update tanpa menumpuk dialog. */
+    private fun tampilDialogPrinter() {
+        val dlg = printerDialog
+        if (dlg != null && dlg.isShowing) { isiDialogPrinter(dlg); return }
+        val builder = AlertDialog.Builder(this)
+            .setNegativeButton("Tutup", null)
+            .create()
+        printerDialog = builder
+        builder.setOnDismissListener { if (!scanAktif) BluetoothPrinter.stopScan(applicationContext) }
+        builder.setButton(AlertDialog.BUTTON_NEUTRAL, if (scanAktif) "Berhenti scan" else "🔍 Scan perangkat") { _, _ ->
+            if (scanAktif) {
+                scanAktif = false
+                BluetoothPrinter.stopScan(applicationContext)
+            } else {
+                scanAktif = true
+                BluetoothPrinter.startScan(applicationContext) { runOnUiThread { isiDialogPrinter(builder) } }
             }
-            .setNegativeButton("Batal", null)
-            .show()
+            isiDialogPrinter(builder)
+        }
+        isiDialogPrinter(builder)
+        builder.show()
+    }
+
+    private fun isiDialogPrinter(dlg: AlertDialog) {
+        val bonded = BluetoothPrinter.pairedDevices()
+        val scan = if (scanAktif) BluetoothPrinter.discoveredDevices() else emptyList()
+        val merged = LinkedHashMap<String, BluetoothDevice>()
+        (bonded + scan).forEach { merged[it.address] = it }
+        val list = merged.values.toList()
+        val names = list.map { it.name + "  ·  " + it.address }.toTypedArray()
+        dlg.setTitle(if (scanAktif) "Memindai… (${list.size})" else "Pilih Printer")
+        dlg.setItems(names) { _, i ->
+            printerAddress = list[i].address
+            prefs.edit().putString("printer", printerAddress).apply()
+            setPrinterLabel()
+        }
+        dlg.getButton(AlertDialog.BUTTON_NEUTRAL)?.text = if (scanAktif) "Berhenti scan" else "🔍 Scan perangkat"
+    }
+
+    override fun onPause() {
+        super.onPause()
+        BluetoothPrinter.stopScan(applicationContext)
+        scanAktif = false
+    }
+
+    override fun onDestroy() {
+        BluetoothPrinter.stopScan(applicationContext)
+        super.onDestroy()
     }
 
     private fun setPrinterLabel() {
@@ -246,7 +336,7 @@ class MainActivity : AppCompatActivity() {
             val bmpList = pilih.map { p ->
                 val bc = if (p.barcode != null && p.barcode.length == 6 && p.barcode.all { it.isDigit() })
                     p.barcode else Code128.generateV3(p.id)
-                EscPosLabel.buatLabel(p.nama, p.harga, bc, 25, 15)
+                EscPosLabel.buatLabel(p.nama, p.harga, bc, paperW, paperH)
             }
             val errWr = BluetoothPrinter.write(EscPosLabel.buatRun(bmpList))
             BluetoothPrinter.close()
@@ -276,8 +366,9 @@ class MainActivity : AppCompatActivity() {
 
         override fun onBindViewHolder(h: VH, pos: Int) {
             val p = items[pos]
-            h.r.chk.text = "${p.nama}" + (p.barcode?.let { "  ·  $it" } ?: "")
             h.r.chk.isChecked = p.id in selected
+            h.r.txtNama.text = p.nama
+            h.r.txtBarcode.text = p.barcode?.let { "Barcode: $it" } ?: "Barcode: otomatis"
             h.itemView.setOnClickListener { onToggle(p.id) }
         }
     }

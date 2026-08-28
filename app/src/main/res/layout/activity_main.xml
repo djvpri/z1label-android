@@ -70,19 +70,45 @@
         android:orientation="vertical"
         android:visibility="gone">
 
-        <EditText
-            android:id="@+id/txtCari"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_margin="8dp"
-            android:hint="Cari produk / barcode..."
-            android:inputType="text" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="8dp"
+            android:paddingTop="8dp">
+
+            <EditText
+                android:id="@+id/txtCari"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="Cari produk / barcode..."
+                android:inputType="text" />
+
+            <Button
+                android:id="@+id/btnSort"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:minWidth="56dp"
+                android:text="Urut" />
+
+            <Button
+                android:id="@+id/btnPaper"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:minWidth="56dp"
+                android:text="Kertas" />
+        </LinearLayout>
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/listProduk"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1" />
+            android:layout_weight="1"
+            android:paddingVertical="4dp" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -96,36 +122,41 @@
                 android:layout_height="wrap_content"
                 android:text="Pilih Printer Bluetooth..." />
 
+            <Button
+                android:id="@+id/btnCetak"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Cetak"
+                android:enabled="false" />
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
                 android:orientation="horizontal">
-
-                <Button
-                    android:id="@+id/btnCetak"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content"
-                    android:text="Cetak"
-                    android:enabled="false" />
 
                 <Button
                     android:id="@+id/btnRefresh"
                     android:layout_width="0dp"
-                    android:layout_weight="1"
                     android:layout_height="wrap_content"
+                    android:layout_weight="1"
                     android:text="Muat Ulang" />
 
                 <Button
                     android:id="@+id/btnLogout"
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
                     android:text="Keluar" />
 
                 <Button
                     android:id="@+id/btnCekUpdate"
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
                     android:text="Update" />
             </LinearLayout>
 
