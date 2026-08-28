@@ -37,8 +37,10 @@ jobs:
       - name: Build signed APK (versi ${{ inputs.version }})
         run: |
           sed -i "s/versionName = .*/versionName = \"${{ inputs.version }}\"/" app/build.gradle.kts
-          # bump versionCode otomatis (dari tanggal)
-          VC=$(date +%Y%m%d)
+          # bump versionCode — pakai EPOCH (detik) supaya SELALU naik antar build.
+          # (jangan `date +%Y%m%d`: dua rilis pada hari yg sama => versionCode sama
+          #  => Android menolak install-over: "app not installed")
+          VC=$(date +%s)
           sed -i "s/versionCode = [0-9]*/versionCode = $VC/" app/build.gradle.kts
           ./gradlew :app:assembleRelease --no-daemon
         env:
