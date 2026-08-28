@@ -31,7 +31,7 @@ object ZposApi {
             conn.setRequestProperty("Content-Type", "application/json")
             conn.outputStream.use { it.write(body.toByteArray()) }
             val code = conn.responseCode
-            val set = conn.headerFields?.get("set-cookie")?.flatten() ?: emptyList()
+            val set = conn.headerFields?.get("set-cookie") ?: emptyList()
             for (h in set) {
                 h.split(";").forEach { p ->
                     val kv = p.trim().split("=", limit = 2)
