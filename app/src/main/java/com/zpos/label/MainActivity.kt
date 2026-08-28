@@ -243,43 +243,42 @@ class MainActivity : AppCompatActivity() {
         tampilDialogPrinter()
     }
 
-    /** Dialog pilih printer tunggal: daftar terpasang + (kalau scan) hasil discovery. Di-update tanpa menumpuk dialog. */
+    /** Dialog pilih printer tunggal: daftar terpasang + (kalau scan) hasil discovery.
+     *  Di-refresh dari scratch (setItems hanya ada di Builder, bukan instance AlertDialog). */
     private fun tampilDialogPrinter() {
-        val dlg = printerDialog
-        if (dlg != null && dlg.isShowing) { isiDialogPrinter(dlg); return }
+        printerDialog?.let { if (it.isShowing) it.dismiss() }
         val builder = AlertDialog.Builder(this)
             .setNegativeButton("Tutup", null)
-            .create()
-        printerDialog = builder
-        builder.setOnDismissListener { if (!scanAktif) BluetoothPrinter.stopScan(applicationContext) }
-        builder.setButton(AlertDialog.BUTTON_NEUTRAL, if (scanAktif) "Berhenti scan" else "🔍 Scan perangkat") { _, _ ->
-            if (scanAktif) {
-                scanAktif = false
-                BluetoothPrinter.stopScan(applicationContext)
-            } else {
-                scanAktif = true
-                BluetoothPrinter.startScan(applicationContext) { runOnUiThread { isiDialogPrinter(builder) } }
-            }
-            isiDialogPrinter(builder)
-        }
         isiDialogPrinter(builder)
-        builder.show()
+        val dlg = builder.create()
+        dlg.setOnDismissListener { if (!scanAktif) BluetoothPrinter.stopScan(applicationContext) }
+        printerDialog = dlg
+        dlg.show()
     }
 
-    private fun isiDialogPrinter(dlg: AlertDialog) {
+    private fun isiDialogPrinter(builder: AlertDialog.Builder) {
         val bonded = BluetoothPrinter.pairedDevices()
         val scan = if (scanAktif) BluetoothPrinter.discoveredDevices() else emptyList()
         val merged = LinkedHashMap<String, BluetoothDevice>()
         (bonded + scan).forEach { merged[it.address] = it }
         val list = merged.values.toList()
         val names = list.map { it.name + "  ·  " + it.address }.toTypedArray()
-        dlg.setTitle(if (scanAktif) "Memindai… (${list.size})" else "Pilih Printer")
-        dlg.setItems(names) { _, i ->
+    builder.setTitle(if (scanAktif) "Memindai… (${list.size})" else "Pilih Printer")
+        builder.setItems(names) { _, i ->
             printerAddress = list[i].address
             prefs.edit().putString("printer", printerAddress).apply()
             setPrinterLabel()
         }
-        dlg.getButton(AlertDialog.BUTTON_NEUTRAL)?.text = if (scanAktif) "Berhenti scan" else "🔍 Scan perangkat"
+        builder.setNeutralButton(if (scanAktif) "Berhenti scan" else "🔍 Scan perangkat") { _, _ ->
+            if (scanAktif) {
+                scanAktif = false
+                BluetoothPrinter.stopScan(applicationContext)
+            } else {
+                scanAktif = true
+                BluetoothPrinter.startScan(applicationContext) { runOnUiThread { tampilDialogPrinter() } }
+            }
+            tampilDialogPrinter()
+        }
     }
 
     override fun onPause() {
