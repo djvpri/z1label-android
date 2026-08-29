@@ -4,6 +4,7 @@ import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
@@ -27,6 +28,7 @@ import com.zpos.label.databinding.ActivityMainBinding
 import com.zpos.label.databinding.ItemProdukBinding
 import com.zpos.label.escpos.EscPosLabel
 import com.zpos.label.update.Updater
+import com.zpos.label.util.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -91,6 +93,7 @@ class MainActivity : AppCompatActivity() {
         b.btnPaper.setOnClickListener { pilihKertas() }
         b.btnCetak.setOnClickListener { cetak() }
         b.btnCekUpdate.setOnClickListener { cekUpdate(otomatis = false) }
+        b.btnKirimLog.setOnClickListener { kirimLogWa() }
 
         val savedEmail = prefs.getString("email", "")
         if (savedEmail != null && savedEmail.isNotEmpty()) {
@@ -119,9 +122,10 @@ class MainActivity : AppCompatActivity() {
     /** Connect otomatis ke printer tersimpan di background; tidak butuh tekan. */
     private fun autoSambungPrinter() {
         val addr = prefs.getString("printer", null) ?: return
-        if (BluetoothPrinter.connected()) { b.lblStatus.text = "Printer terhubung"; return }
+        if (BluetoothPrinter.connected()) { b.lblStatus.text = "Printer terhubung"; Logger.log(this, "bt", "sudah terhubung $addr"); return }
         if (!bluetoothOk(ask = true)) return   // minta izin BT dulu
         b.lblStatus.text = "Menghubungkan printer…"
+        Logger.log(this, "bt", "auto-connect $addr")
         BluetoothPrinter.autoConnect(addr)
     }
 
@@ -131,6 +135,7 @@ class MainActivity : AppCompatActivity() {
             val rilis = withContext(Dispatchers.IO) { Updater.cekTerbaru() } ?: run {
                 withContext(Dispatchers.Main) {
                     if (!otomatis) b.lblStatus.text = "Gagal cek update / belum ada rilis"
+                    Logger.log(this@MainActivity, "update", "gagal cek rilis")
                 }
                 return@launch
             }
@@ -151,6 +156,7 @@ class MainActivity : AppCompatActivity() {
                             b.lblStatus.text = "Mengunduh APK..."
                             val ok = Updater.unduhDanInstall(this@MainActivity, url)
                             withContext(Dispatchers.Main) {
+                                Logger.log(this@MainActivity, "update", if (ok) "unduh+install berhasil" else "unduh/install GAGAL: $url")
                                 b.lblStatus.text = if (ok) "Unduh selesai — install di sistem" else "Unduh gagal"
                             }
                         }
@@ -173,8 +179,10 @@ class MainActivity : AppCompatActivity() {
             val err = ZposApi.login(email, sandi)
             withContext(Dispatchers.Main) {
                 if (err != null) {
+                    Logger.log(this@MainActivity, "login", "gagal: $err")
                     b.lblLogin.text = "Gagal: $err"
                 } else {
+                    Logger.log(this@MainActivity, "login", "sukses $email")
                     prefs.edit().putString("email", email).putString("sandi", sandi).apply()
                     b.lblLogin.text = ""
                     showMain()
@@ -195,6 +203,7 @@ class MainActivity : AppCompatActivity() {
                     b.btnCetak.isEnabled = false
                     b.lblStatus.text = "${semua.size} produk"
                 }.onFailure { e ->
+                    Logger.log(this@MainActivity, "load", "gagal: ${e.message}")
                     b.lblStatus.text = "Gagal muat: ${e.message}"
                 }
             }
@@ -305,10 +314,29 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
+    /** Kirim log sesi ke WhatsApp (pastikan WA terinstall); fallback ke chooser umum. */
+    private fun kirimLogWa() {
+        val teks = Logger.ambil(this) + "\nPrinter: " + (printerAddress ?: "-") +
+            "\nStatus: " + if (BluetoothPrinter.connected()) "terhubung" else "putus"
+        val i = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, teks)
+            setPackage("com.whatsapp")
+        }
+        try {
+            startActivity(i)
+        } catch (_: Exception) {
+            // WA tak terinstall: lempar ke app share apa pun (Email, dsb)
+            runCatching { startActivity(Intent.createChooser(i, "Kirim Log Z1 Label")) }
+        }
+    }
+
     private fun setPrinterLabel() {
         b.btnPrinter.text = "Printer: " + (printerAddress?.take(6)?.let { "…$it" } ?: "belum pilih")
         BluetoothPrinter.onStateChange = { ok ->
             runOnUiThread {
+                if (ok) Logger.log(this, "bt", "terhubung")
+                else Logger.log(this, "bt", "terputus")
                 b.lblStatus.text = if (ok) "Printer terhubung" else "Printer terputus — cetak utk sambung ulang"
                 setPrinterLabel()
             }
@@ -349,6 +377,7 @@ class MainActivity : AppCompatActivity() {
             if (!BluetoothPrinter.connected()) {
                 val errConn = BluetoothPrinter.connect(addr)
                 if (errConn != null) {
+                    Logger.log(this@MainActivity, "cetak", "gagal konek $addr: $errConn")
                     withContext(Dispatchers.Main){
                         b.lblStatus.text = "Gagal konek: $errConn"; b.btnCetak.isEnabled = true
                     }; return@launch
@@ -361,6 +390,7 @@ class MainActivity : AppCompatActivity() {
                 EscPosLabel.buatLabel(p.nama, p.harga, bc, paperW, paperH)
             }
             val errWr = BluetoothPrinter.write(EscPosLabel.buatRun(bmpList))
+            Logger.log(this@MainActivity, "cetak", if (errWr != null) "gagal: $errWr" else "ok ${pilih.size} label")
             // socket TIDAK ditutup: biar cetak berikutnya langsung (hemat waktu koneksi)
             withContext(Dispatchers.Main) {
                 b.lblStatus.text = if (errWr != null) "Cetak gagal: $errWr"
