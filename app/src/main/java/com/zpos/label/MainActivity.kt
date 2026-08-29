@@ -126,7 +126,16 @@ class MainActivity : AppCompatActivity() {
         if (!bluetoothOk(ask = true)) return   // minta izin BT dulu
         b.lblStatus.text = "Menghubungkan printer…"
         Logger.log(this, "bt", "auto-connect $addr")
-        BluetoothPrinter.autoConnect(addr)
+        BluetoothPrinter.autoConnect(addr) { err ->
+            runOnUiThread {
+                if (err != null) {
+                    Logger.log(this, "bt", "auto-connect GAGAL: $err")
+                    b.lblStatus.text = "Printer tak terhubung: $err"
+                } else {
+                    Logger.log(this, "bt", "auto-connect sukses")
+                }
+            }
+        }
     }
 
     /** Cek versi rilis GitHub; kalau ada baru, tawarkan unduh-install. */

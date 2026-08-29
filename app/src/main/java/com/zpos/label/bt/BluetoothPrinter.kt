@@ -39,6 +39,9 @@ object BluetoothPrinter {
     var onStateChange: ((connected: Boolean) -> Unit)? = null
     @Volatile private var notifiedConnected = false
 
+    /** Pesan error koneksi terakhir (utk log/diagnosa). Di-reset tiap connect. */
+    @Volatile var lastError: String? = null
+
     // device hasil discovery (di luar daftar bonded)
     private val discovered = LinkedHashMap<String, BluetoothDevice>()
     private var scanReceiver: BroadcastReceiver? = null
@@ -78,9 +81,13 @@ object BluetoothPrinter {
 
     /** Connect pakai UUID SPP > fallback refleksi. Hanya connect (tanpa close) + mulai monitor. */
     fun connect(address: String): String? {
+        lastError = null
         try {
             val adapter = BluetoothAdapter.getDefaultAdapter() ?: return "Bluetooth tidak tersedia"
             val dev = adapter.getRemoteDevice(address) ?: return "Perangkat tidak ditemukan"
+            if (dev.bondState != BluetoothDevice.BOND_BONDED && !bond(address)) {
+                return "Perangkat belum dipasangkan (bonding gagal)"
+            }
 
             var s = try {
                 dev.createRfcommSocketToServiceRecord(SPP_UUID)
@@ -101,24 +108,46 @@ object BluetoothPrinter {
             notifyConnected(true)
             return null
         } catch (e: Exception) {
+            val msg = e.message ?: "Gagal konek"
+            lastError = msg
             close()
-            return e.message ?: "Gagal konek"
+            return msg
         }
+    }
+
+    /** Bond device (memicu dialog pairing sistem sekali). Tunggu sampai bonded. */
+    private fun bond(address: String): Boolean {
+        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return false
+        val dev = adapter.getRemoteDevice(address) ?: return false
+        return try {
+            if (dev.bondState == BluetoothDevice.BOND_BONDED) true
+            else if (!dev.createBond()) false
+            else {
+                // tunggu state jadi BOND_BONDED (maks ~12dtk), createBond async
+                repeat(24) {
+                    if (dev.bondState == BluetoothDevice.BOND_BONDED) return true
+                    Thread.sleep(500)
+                }
+                dev.bondState == BluetoothDevice.BOND_BONDED
+            }
+        } catch (_: Exception) { false }
     }
 
     /**
      * Connect di background utk perangkat tersimpan. Tak `cancel()` UI & tak login block.
-     * Hasil lewat [onStateChange]. Kalau sudah terhubung (dari connect sebelumnya) -> sukses cepat.
+     * Hasil lewat [onStateChange] + [onResult] (err). Kalau sudah terhubung -> sukses cepat.
+     * Kalau perangkat belum bonded -> bonding otomatis (sekali prompt pairing).
      */
-    fun autoConnect(address: String?) {
-        if (address.isNullOrBlank()) return
+    fun autoConnect(address: String?, onResult: ((err: String?) -> Unit)? = null) {
+        if (address.isNullOrBlank()) { onResult?.invoke("alamat printer kosong"); return }
         Thread {
-            if (connected()) { notifyConnected(true); return@Thread }
+            if (connected()) { notifyConnected(true); onResult?.invoke(null); return@Thread }
             val err = connect(address)
             if (err != null) {
-                notifyConnected(false)
-                // siap utk usaha ulang berikutnya (user tekan cetak / buka lagi)
+                // tetap kabari UI walau guard notifiedConnected false: user perlu tahu BELUM sambung
+                onStateChange?.let { runCatching { it(false) } }
             }
+            onResult?.invoke(err)
         }.apply { isDaemon = true }.start()
     }
 
