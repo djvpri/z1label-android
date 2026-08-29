@@ -70,6 +70,7 @@ class MainActivity : AppCompatActivity() {
         paperH = paper.getOrNull(1)?.toIntOrNull() ?: 15
         b.btnSort.text = if (sortMode == "baru") "Urut: Terbaru" else "Urut: Nama A-Z"
         b.btnPaper.text = "Kertas ${paperW}x${paperH}"
+        b.txtVersion.text = "Z1 Label — versi ${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})"
         setPrinterLabel()
 
         adapter = ProdukAdapter { id ->

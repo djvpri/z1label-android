@@ -175,6 +175,15 @@
                 android:layout_marginTop="4dp"
                 android:text=""
                 android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/txtVersion"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Z1 Label"
+                android:textSize="11sp"
+                android:textColor="#888" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>
