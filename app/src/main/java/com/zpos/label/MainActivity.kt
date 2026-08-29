@@ -112,6 +112,17 @@ class MainActivity : AppCompatActivity() {
         b.mainView.visibility = View.VISIBLE
         loadProduk()
         cekUpdate(otomatis = true)
+        // auto-connect printer tersimpan (konsep GPrinter: buka app = langsung terhubung)
+        autoSambungPrinter()
+    }
+
+    /** Connect otomatis ke printer tersimpan di background; tidak butuh tekan. */
+    private fun autoSambungPrinter() {
+        val addr = prefs.getString("printer", null) ?: return
+        if (BluetoothPrinter.connected()) { b.lblStatus.text = "Printer terhubung"; return }
+        if (!bluetoothOk(ask = true)) return   // minta izin BT dulu
+        b.lblStatus.text = "Menghubungkan printer…"
+        BluetoothPrinter.autoConnect(addr)
     }
 
     /** Cek versi rilis GitHub; kalau ada baru, tawarkan unduh-install. */
@@ -289,12 +300,20 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         BluetoothPrinter.stopScan(applicationContext)
+        BluetoothPrinter.onStateChange = null
+        BluetoothPrinter.close()
         super.onDestroy()
     }
 
     private fun setPrinterLabel() {
         b.btnPrinter.text = "Printer: " + (printerAddress?.take(6)?.let { "…$it" } ?: "belum pilih")
-        b.lblStatus.text = if (BluetoothPrinter.connected()) "Printer terhubung" else "Printer belum konek"
+        BluetoothPrinter.onStateChange = { ok ->
+            runOnUiThread {
+                b.lblStatus.text = if (ok) "Printer terhubung" else "Printer terputus — cetak utk sambung ulang"
+                setPrinterLabel()
+            }
+        }
+
     }
 
     private fun bluetoothOk(ask: Boolean): Boolean {
@@ -326,11 +345,14 @@ class MainActivity : AppCompatActivity() {
             val pilih = tampil.filter { it.id in selected }
             if (pilih.isEmpty()) { withContext(Dispatchers.Main){ b.btnCetak.isEnabled=true; b.lblStatus.text="Pilih produk dulu" }; return@launch }
 
-            val errConn = BluetoothPrinter.connect(addr)
-            if (errConn != null) {
-                withContext(Dispatchers.Main){
-                    b.lblStatus.text = "Gagal konek: $errConn"; b.btnCetak.isEnabled = true
-                }; return@launch
+            // konek bila belum (auto-connect mungkin sudah buat); socket dijaga hidup antar cetak
+            if (!BluetoothPrinter.connected()) {
+                val errConn = BluetoothPrinter.connect(addr)
+                if (errConn != null) {
+                    withContext(Dispatchers.Main){
+                        b.lblStatus.text = "Gagal konek: $errConn"; b.btnCetak.isEnabled = true
+                    }; return@launch
+                }
             }
             // bangun label: barcode v3 utk produk yang belum punya / bukan 6 digit numerik
             val bmpList = pilih.map { p ->
@@ -339,7 +361,7 @@ class MainActivity : AppCompatActivity() {
                 EscPosLabel.buatLabel(p.nama, p.harga, bc, paperW, paperH)
             }
             val errWr = BluetoothPrinter.write(EscPosLabel.buatRun(bmpList))
-            BluetoothPrinter.close()
+            // socket TIDAK ditutup: biar cetak berikutnya langsung (hemat waktu koneksi)
             withContext(Dispatchers.Main) {
                 b.lblStatus.text = if (errWr != null) "Cetak gagal: $errWr"
                     else "Cetak ${pilih.size} label ✓ (barcode baru otomatis utk yg kosong)"
