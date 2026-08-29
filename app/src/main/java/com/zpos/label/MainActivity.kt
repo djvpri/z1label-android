@@ -398,6 +398,8 @@ class MainActivity : AppCompatActivity() {
             val pilih = tampil.filter { it.id in selected }
             if (pilih.isEmpty()) { withContext(Dispatchers.Main){ b.btnCetak.isEnabled=true; b.lblStatus.text="Pilih produk dulu" }; return@launch }
 
+            Logger.log(this@MainActivity, "cetak", "mulai ${pilih.size} label, kertas ${paperW}x${paperH}mm, print ${printerAddress ?: "-"}")
+
             // konek bila belum (auto-connect mungkin sudah buat); socket dijaga hidup antar cetak
             if (!BluetoothPrinter.connected()) {
                 val errConn = BluetoothPrinter.connect(addr)
@@ -408,20 +410,43 @@ class MainActivity : AppCompatActivity() {
                     }; return@launch
                 }
             }
-            // bangun label: barcode v3 utk produk yang belum punya / bukan 6 digit numerik
-            val bmpList = pilih.map { p ->
-                val bc = if (p.barcode != null && p.barcode.length == 6 && p.barcode.all { it.isDigit() })
-                    p.barcode else Code128.generateV3(p.id)
-                EscPosLabel.buatLabel(p.nama, p.harga, bc, paperW, paperH)
+
+            // bangun + kirim label; tiap tahap di-cover try/catch utk tangkap kenapa gagal
+            try {
+                val bmpList = pilih.mapIndexed { idx, p ->
+                    try {
+                        val bc = if (p.barcode != null && p.barcode.length == 6 && p.barcode.all { it.isDigit() })
+                            p.barcode else Code128.generateV3(p.id)
+                        EscPosLabel.buatLabel(p.nama, p.harga, bc, paperW, paperH)
+                    } catch (e: Exception) {
+                        Logger.log(this@MainActivity, "cetak",
+                            "gagal bulat-label #$idx (${p.nama} id ${p.id} bc ${p.barcode}): ${e::class.simpleName}: ${e.message}")
+                        throw e
+                    }
+                }
+                val run = try {
+                    EscPosLabel.buatRun(bmpList)
+                } catch (e: Exception) {
+                    Logger.log(this@MainActivity, "cetak", "gagal buatRun: ${e::class.simpleName}: ${e.message}")
+                    throw e
+                }
+                val errWr = BluetoothPrinter.write(run)
+                Logger.log(this@MainActivity, "cetak",
+                    if (errWr != null) "kirim GAGAL: $errWr" else "kirim OK ${pilih.size} label, ${run.size} byte")
+                withContext(Dispatchers.Main) {
+                    b.lblStatus.text = if (errWr != null) "Cetak gagal: $errWr"
+                        else "Cetak ${pilih.size} label ✓ (barcode baru otomatis utk yg kosong)"
+                    b.btnCetak.isEnabled = true
+                }
+            } catch (e: Exception) {
+                // tangkap apa pun (buat-label, buatRun, write) — jangan biarkan bocor -> crash app
+                Logger.log(this@MainActivity, "cetak", "EXCEPTION: ${e::class.simpleName}: ${e.message}")
+                withContext(Dispatchers.Main) {
+                    b.lblStatus.text = "Cetak gagal: ${e.message ?: e::class.simpleName}"
+                    b.btnCetak.isEnabled = true
+                }
             }
-            val errWr = BluetoothPrinter.write(EscPosLabel.buatRun(bmpList))
-            Logger.log(this@MainActivity, "cetak", if (errWr != null) "gagal: $errWr" else "ok ${pilih.size} label")
             // socket TIDAK ditutup: biar cetak berikutnya langsung (hemat waktu koneksi)
-            withContext(Dispatchers.Main) {
-                b.lblStatus.text = if (errWr != null) "Cetak gagal: $errWr"
-                    else "Cetak ${pilih.size} label ✓ (barcode baru otomatis utk yg kosong)"
-                b.btnCetak.isEnabled = true
-            }
         }
     }
 
