@@ -81,21 +81,36 @@ object Updater {
     /** Download APK ke cache lalu minta install (buka system installer). */
     suspend fun unduhDanInstall(ctx: Context, url: String): Boolean {
         lastErr = null
+        val attempts = 3   // retry: "connection abort / reset" sering transient
         val file = try {
             withContext(Dispatchers.IO) {
                 val f = File(ctx.cacheDir, "z1label-update.apk")
-                f.delete()
-                val conn = URL(url).openConnection() as HttpURLConnection
-                conn.connectTimeout = 20000; conn.readTimeout = 60000
-                val code = conn.responseCode
-                if (code != 200) { lastErr = "download: HTTP $code"; return@withContext null }
-                try {
-                    conn.inputStream.use { inp -> f.outputStream().use { out -> inp.copyTo(out) } }
-                } finally { conn.disconnect() }
-                f
+                var yangTerak = "?"
+                for (i in 1..attempts) {
+                    try {
+                        f.delete()
+                        val conn = URL(url).openConnection() as HttpURLConnection
+                        conn.connectTimeout = 20000; conn.readTimeout = 60000
+                        try {
+                            val code = conn.responseCode
+                            if (code != 200) {
+                                yangTerak = "HTTP $code"
+                                conn.disconnect()
+                                continue        // retry buat status non-200 juga
+                            }
+                            conn.inputStream.use { inp -> f.outputStream().use { out -> inp.copyTo(out) } }
+                        } finally { conn.disconnect() }
+                        return@withContext f                     // sukses
+                    } catch (e: Exception) {
+                        yangTerak = "${e::class.simpleName}: ${e.message}"
+                        // perlu jeda singkat antar retry, apalagi connection abort
+                        Thread.sleep(800L)
+                    }
+                }
+                lastErr = "download: GAGAL ${attempts}x — $yangTerak"
+                null
             }
         } catch (e: Exception) {
-            // PENTING: jangan biarkan exception bocor keluar coroutine -> dulu bikin app crash
             lastErr = "download: ${e::class.simpleName}: ${e.message}"
             null
         } ?: return false
