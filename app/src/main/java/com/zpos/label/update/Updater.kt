@@ -32,9 +32,18 @@ object Updater {
 
     data class Rilis(val versi: String, val apkUrl: String?)
 
+    /** Pesan error operasi update terakhir (utk log / kirim-WA). Null = sukses. */
+    @Volatile var lastErr: String? = null
+
     /** Cek rilis terbaru dari GitHub. */
     fun cekTerbaru(): Rilis? {
-        val conn = URL("$HOST/repos/$REPO/releases/latest").openConnection() as HttpURLConnection
+        lastErr = null
+        val conn = try {
+            URL("$HOST/repos/$REPO/releases/latest").openConnection() as HttpURLConnection
+        } catch (e: Exception) {
+            lastErr = "cek: URL/open gagal: ${e.message}"; null
+        }
+        if (conn == null) return null
         conn.apply {
             connectTimeout = 12000; readTimeout = 12000
             setRequestProperty("Accept", "application/vnd.github+json")
@@ -42,13 +51,17 @@ object Updater {
         }
         return try {
             val code = conn.responseCode
-            if (code != 200) return null
+            if (code != 200) { lastErr = "cek: HTTP $code"; return null }
             val js = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
             val apk = js.getJSONArray("assets").let { arr ->
                 (0 until arr.length()).map { arr.getJSONObject(it).optString("browser_download_url") }
                     .firstOrNull { it.endsWith(".apk") }
             }
+            if (apk == null) lastErr = "cek: salah (tak ada asset .apk)"
             Rilis(js.optString("tag_name"), apk)
+        } catch (e: Exception) {
+            lastErr = "cek: ${e::class.simpleName}: ${e.message}"
+            null
         } finally {
             conn.disconnect()
         }
@@ -67,13 +80,24 @@ object Updater {
 
     /** Download APK ke cache lalu minta install (buka system installer). */
     suspend fun unduhDanInstall(ctx: Context, url: String): Boolean {
-        val file = withContext(Dispatchers.IO) {
-            val f = File(ctx.cacheDir, "z1label-update.apk")
-            f.delete()
-            val conn = URL(url).openConnection() as HttpURLConnection
-            conn.connectTimeout = 20000; conn.readTimeout = 60000
-            if (conn.responseCode != 200) null
-            else conn.inputStream.use { inp -> f.outputStream().use { out -> inp.copyTo(out) } }.let { f }
+        lastErr = null
+        val file = try {
+            withContext(Dispatchers.IO) {
+                val f = File(ctx.cacheDir, "z1label-update.apk")
+                f.delete()
+                val conn = URL(url).openConnection() as HttpURLConnection
+                conn.connectTimeout = 20000; conn.readTimeout = 60000
+                val code = conn.responseCode
+                if (code != 200) { lastErr = "download: HTTP $code"; return@withContext null }
+                try {
+                    conn.inputStream.use { inp -> f.outputStream().use { out -> inp.copyTo(out) } }
+                } finally { conn.disconnect() }
+                f
+            }
+        } catch (e: Exception) {
+            // PENTING: jangan biarkan exception bocor keluar coroutine -> dulu bikin app crash
+            lastErr = "download: ${e::class.simpleName}: ${e.message}"
+            null
         } ?: return false
         val act = ctx as? Activity ?: return false
         act.runOnUiThread {

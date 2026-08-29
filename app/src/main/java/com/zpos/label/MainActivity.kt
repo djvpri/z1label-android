@@ -28,6 +28,7 @@ import com.zpos.label.databinding.ActivityMainBinding
 import com.zpos.label.databinding.ItemProdukBinding
 import com.zpos.label.escpos.EscPosLabel
 import com.zpos.label.update.Updater
+import com.zpos.label.util.CrashReport
 import com.zpos.label.util.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -59,6 +60,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        CrashReport.install(applicationContext)   // tangkap crash sebelum app keluar
         b = ActivityMainBinding.inflate(layoutInflater)
         setContentView(b.root)
 
@@ -142,10 +144,14 @@ class MainActivity : AppCompatActivity() {
     /** Cek versi rilis GitHub; kalau ada baru, tawarkan unduh-install. */
     private fun cekUpdate(otomatis: Boolean) {
         scope.launch {
-            val rilis = withContext(Dispatchers.IO) { Updater.cekTerbaru() } ?: run {
+            val rilis = try {
+                withContext(Dispatchers.IO) { Updater.cekTerbaru() }
+            } catch (e: Exception) {
+                null
+            } ?: run {
                 withContext(Dispatchers.Main) {
                     if (!otomatis) b.lblStatus.text = "Gagal cek update / belum ada rilis"
-                    Logger.log(this@MainActivity, "update", "gagal cek rilis")
+                    Logger.log(this@MainActivity, "update", "gagal cek rilis: ${Updater.lastErr ?: "null"}")
                 }
                 return@launch
             }
@@ -164,10 +170,17 @@ class MainActivity : AppCompatActivity() {
                         if (url == null) { Toast.makeText(this@MainActivity, "APK tidak tersedia", Toast.LENGTH_SHORT).show() }
                         else scope.launch {
                             b.lblStatus.text = "Mengunduh APK..."
-                            val ok = Updater.unduhDanInstall(this@MainActivity, url)
+                            val ok = try {
+                                Updater.unduhDanInstall(this@MainActivity, url)
+                            } catch (e: Exception) {
+                                Updater.lastErr = "unduh: ${e::class.simpleName}: ${e.message}"
+                                false
+                            }
                             withContext(Dispatchers.Main) {
-                                Logger.log(this@MainActivity, "update", if (ok) "unduh+install berhasil" else "unduh/install GAGAL: $url")
-                                b.lblStatus.text = if (ok) "Unduh selesai — install di sistem" else "Unduh gagal"
+                                Logger.log(this@MainActivity, "update",
+                                    if (ok) "unduh+install berhasil"
+                                    else "unduh/install GAGAL: ${Updater.lastErr ?: url}")
+                                b.lblStatus.text = if (ok) "Unduh selesai — install di sistem" else "Unduh gagal: ${Updater.lastErr ?: ""}"
                             }
                         }
                     }
@@ -326,8 +339,10 @@ class MainActivity : AppCompatActivity() {
 
     /** Kirim log sesi ke WhatsApp (pastikan WA terinstall); fallback ke chooser umum. */
     private fun kirimLogWa() {
+        val crash = CrashReport.ambil(this)
         val teks = Logger.ambil(this) + "\nPrinter: " + (printerAddress ?: "-") +
-            "\nStatus: " + if (BluetoothPrinter.connected()) "terhubung" else "putus"
+            "\nStatus: " + if (BluetoothPrinter.connected()) "terhubung" else "putus" +
+            if (crash.isNotBlank()) "\n\n=== CRASH TERAKHIR ===\n" + crash.trim() else ""
         val i = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
             putExtra(Intent.EXTRA_TEXT, teks)
