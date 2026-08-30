@@ -188,7 +188,7 @@ class MainActivity : AppCompatActivity() {
                         val url = rilis.apkUrl
                         if (url == null) { Toast.makeText(this@MainActivity, "APK tidak tersedia", Toast.LENGTH_SHORT).show() }
                         else scope.launch {
-                            b.lblStatus.text = "Mengunduh APK..."
+                            withContext(Dispatchers.Main) { b.lblStatus.text = "Mengunduh APK..." }
                             val ok = try {
                                 Updater.unduhDanInstall(this@MainActivity, url)
                             } catch (e: Exception) {
