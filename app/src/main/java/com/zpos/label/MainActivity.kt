@@ -30,6 +30,9 @@ import com.zpos.label.escpos.EscPosLabel
 import com.zpos.label.update.Updater
 import com.zpos.label.util.CrashReport
 import com.zpos.label.util.Logger
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
@@ -111,7 +114,7 @@ class MainActivity : AppCompatActivity() {
         b.btnProto.setOnClickListener { toggleProto() }
         b.btnCetak.setOnClickListener { cetak() }
         b.btnCekUpdate.setOnClickListener { cekUpdate(otomatis = false) }
-        b.btnKirimLog.setOnClickListener { kirimLogWa() }
+        b.btnKirimLog.setOnClickListener { kirimLog() }
 
         val savedEmail = prefs.getString("email", "")
         if (savedEmail != null && savedEmail.isNotEmpty()) {
@@ -360,21 +363,45 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** Kirim log sesi ke WhatsApp (pastikan WA terinstall); fallback ke chooser umum. */
-    private fun kirimLogWa() {
+    private fun kirimLog() {
         val crash = CrashReport.ambil(this)
         val teks = Logger.ambil(this) + "\nPrinter: " + (printerAddress ?: "-") +
             "\nStatus: " + if (BluetoothPrinter.connected()) "terhubung" else "putus" +
             if (crash.isNotBlank()) "\n\n=== CRASH TERAKHIR ===\n" + crash.trim() else ""
-        val i = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, teks)
-            setPackage("com.whatsapp")
-        }
-        try {
-            startActivity(i)
-        } catch (_: Exception) {
-            // WA tak terinstall: lempar ke app share apa pun (Email, dsb)
-            runCatching { startActivity(Intent.createChooser(i, "Kirim Log Z1 Label")) }
+        // endpoint log VPS -> GitHub djvpri/z1label-logs (ku/agent bisa akses utk perbaikan)
+        val body = JSONObject()
+            .put("key", "z1label-secret-8f3a")
+            .put("versi", BuildConfig.VERSION_NAME)
+            .put("pesan", teks)
+        b.lblStatus.text = "Mengirim log..."
+        scope.launch {
+            val err = try {
+                val conn = URL("http://103.93.129.94:8123/log").openConnection() as HttpURLConnection
+                try {
+                    conn.requestMethod = "POST"
+                    conn.doOutput = true
+                    conn.connectTimeout = 8000
+                    conn.readTimeout = 8000
+                    conn.setRequestProperty("Content-Type", "application/json")
+                    conn.setFixedLengthStreamingMode(body.toString().toByteArray().size)
+                    conn.outputStream.use { it.write(body.toString().toByteArray()) }
+                    if (conn.responseCode != 200) "HTTP ${conn.responseCode}" else null
+                } finally { conn.disconnect() }
+            } catch (e: Exception) { "${e::class.simpleName}: ${e.message}" }
+            withContext(Dispatchers.Main) {
+                if (err == null) {
+                    Logger.log(this@MainActivity, "log", "terkirim v${BuildConfig.VERSION_NAME}")
+                    b.lblStatus.text = "Log terkirim"
+                    Toast.makeText(this@MainActivity, "Log terkirim ke server", Toast.LENGTH_SHORT).show()
+                } else {
+                    Logger.log(this@MainActivity, "log", "gagal terkirim: $err")
+                    b.lblStatus.text = "Gagal kirim log ($err)"
+                    Toast.makeText(this@MainActivity, "Gagal kirim: $err", Toast.LENGTH_LONG).show()
+                    // fallback manual via WhatsApp/share
+                    val ii = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, teks) }
+                    runCatching { startActivity(Intent.createChooser(ii, "Kirim Log Z1 Label")) }
+                }
+            }
         }
     }
 
