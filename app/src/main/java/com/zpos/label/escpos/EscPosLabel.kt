@@ -138,13 +138,16 @@ object EscPosLabel {
         val w = (widthMm * DOTS_PER_MM).toInt()   // 200
         val h = (heightMm * DOTS_PER_MM).toInt()  // 120
         val out = ByteArrayOutputStream()
-        out.write("SIZE $w,$h\n".toByteArray(Charsets.US_ASCII))
-        out.write("GAP 16,0\nCLS\n".toByteArray(Charsets.US_ASCII))
+        val eol = "\r\n"
+        out.write("SIZE $w,$h$eol".toByteArray(Charsets.US_ASCII))
+        out.write("GAP 16,0$eol".toByteArray(Charsets.US_ASCII))
+        out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
         for (l in ls) {
-            out.write("TEXT 4,4,\"1\",0,2,2,\"${clipTsp(l.nama, 16)}\"\n".toByteArray(Charsets.US_ASCII))
-            out.write("TEXT 4,28,\"3\",0,2,2,\"${clipTsp(l.harga, 24)}\"\n".toByteArray(Charsets.US_ASCII))
-            out.write("BARCODE 8,50,\"128\",60,0,0,2,\"${sanitizeTsp(l.bc)}\"\n".toByteArray(Charsets.US_ASCII))
-            out.write("PRINT 1,1\n".toByteArray(Charsets.US_ASCII))
+            out.write("TEXT 4,4,\"1\",0,2,2,\"${clipTsp(l.nama, 16)}\"$eol".toByteArray(Charsets.US_ASCII))
+            out.write("TEXT 4,28,\"3\",0,2,2,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
+            out.write("BARCODE 8,50,\"128\",60,0,0,2,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
+            out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))
+            out.write("FORFEED$eol".toByteArray(Charsets.US_ASCII))
         }
         return out.toByteArray()
     }
