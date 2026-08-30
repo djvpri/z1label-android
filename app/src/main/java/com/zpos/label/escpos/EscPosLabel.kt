@@ -98,7 +98,7 @@ object EscPosLabel {
             val px = xQ
             for (yy in 0 until sizePx) {
                 for (xx in 0 until sizePx) {
-                    if (qr.get(xx, yy, 0)) c.drawRect((px + xx).toFloat(), (topBar + yy).toFloat(), (px + xx + 1).toFloat(), (topBar + yy + 1).toFloat(), bcPaint)
+                    if (qr.get(xx, yy)) c.drawRect((px + xx).toFloat(), (topBar + yy).toFloat(), (px + xx + 1).toFloat(), (topBar + yy + 1).toFloat(), bcPaint)
                 }
             }
         } else if (barcode.length == 13 && barcode.all { it.isDigit() }) {
