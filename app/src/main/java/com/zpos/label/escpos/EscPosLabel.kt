@@ -211,8 +211,10 @@ object EscPosLabel {
         for (l in ls) {
             if (barcode2d) {
                 // QR code — padat, module tebal (terbaca di label kecil). TSPL: BARCODE x,y,"QRCODE",height,0,0,module,"data"
+                // NOTE: sebagian clabel menolak height=0 utk QR -> pakai tinggi tersedia (>0).
                 val topY = if (includeNama) 40 else 30
                 val (mQ, xQ) = qrGeo(l.bc, w, h, topY)
+                val qrH = (h - topY).coerceAtLeast(30)   // tinggi QR (dot) utk param ke-4
                 val bcSan = sanitizeTsp(l.bc)
                 if (includeNama) {
                     out.write("TEXT 4,4,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.nama, 14)}\"$eol".toByteArray(Charsets.US_ASCII))
@@ -220,7 +222,7 @@ object EscPosLabel {
                 } else {
                     out.write("TEXT 4,4,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
                 }
-                out.write("BARCODE $xQ,$topY,\"QRCODE\",0,0,0,$mQ,\"$bcSan\"$eol".toByteArray(Charsets.US_ASCII))
+                out.write("BARCODE $xQ,$topY,\"QRCODE\",$qrH,0,0,$mQ,\"$bcSan\"$eol".toByteArray(Charsets.US_ASCII))
             } else {
                 val (bcX, bcN) = barcodeGeo(l.bc, w)
                 if (includeNama) {
