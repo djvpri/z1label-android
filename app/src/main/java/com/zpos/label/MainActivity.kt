@@ -24,7 +24,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.zpos.label.api.Produk
 import com.zpos.label.api.ZposApi
-import com.zpos.label.bc.Code128
+import com.zpos.label.api.barcodeLabel
 import com.zpos.label.bt.BluetoothPrinter
 import com.zpos.label.databinding.ActivityMainBinding
 import com.zpos.label.databinding.ItemProdukBinding
@@ -496,8 +496,8 @@ class MainActivity : AppCompatActivity() {
             // preview dulu sebelum mencetak (render bitmap label pertama, konfirmasi user)
             val labelPertama = pilih.first()
             val previewBmp = try {
-                val bcP = labelPertama.barcode?.takeIf { it.isNotBlank() } ?: Code128.generateV3(labelPertama.id)
-                EscPosLabel.previewBitmap(labelPertama.nama, labelPertama.harga, bcP, paperW, paperH, barcode2d = barcodeMode == "2d")
+                val bcP = barcodeLabel(labelPertama)
+      ...[truncated]
             } catch (e: Exception) { null }
             if (previewBmp != null) {
                 val lanjut = konfirmasiPrintPreview(previewBmp, pilih.size)
@@ -526,14 +526,14 @@ class MainActivity : AppCompatActivity() {
                     if (proto == "tspl") {
                         // printer label (clabel, dll) : TSPL — printer render text+barcode sendiri
                         val data = pilih.map { p ->
-                            val bc = p.barcode?.takeIf { it.isNotBlank() } ?: Code128.generateV3(p.id)
+                            val bc = barcodeLabel(p)
                             EscPosLabel.LabelT(p.nama, p.harga, bc)
                         }
                         EscPosLabel.buatRunTSPL(data, paperW, paperH, includeNama = paperH <= 20, fontMul = fontMul, barcode2d = barcodeMode == "2d")
                     } else {
                         val bmpList = pilih.mapIndexed { idx, p ->
                             try {
-                                val bc = p.barcode?.takeIf { it.isNotBlank() } ?: Code128.generateV3(p.id)
+                                val bc = barcodeLabel(p)
                                 EscPosLabel.buatLabel(p.nama, p.harga, bc, paperW, paperH)
                             } catch (e: Exception) {
                                 Logger.log(this@MainActivity, "cetak",

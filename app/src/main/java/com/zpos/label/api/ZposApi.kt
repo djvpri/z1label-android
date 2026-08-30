@@ -4,15 +4,24 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import com.zpos.label.bc.Code128
 
 /** Produk dari z1pos (GET /api/produk?semua=1). */
 data class Produk(
     val id: Long,
     val nama: String,
-    val barcode: String?, // bisa null -> yg baru di-generate pakai Code128.generateV3
+    val barcode: String?, // barcode asli (EAN-13 asli / internal lama); bisa null
+    val barcodeInternal: String?, // barcode internal 6-digit v3 utk label pendek (bila ada)
     val harga: String,
     val satuan: String?
 )
+
+/** Barcode utk LABEL: utamakan barcode_internal pendek (Code128-C tebal => terbaca 25mm),
+ *  lalu barcode asli, lalu generate lokal 6-digit. */
+fun barcodeLabel(p: Produk): String =
+    p.barcodeInternal?.takeIf { it.isNotBlank() }
+        ?: p.barcode?.takeIf { it.isNotBlank() }
+        ?: Code128.generateV3(p.id)
 
 object ZposApi {
 
@@ -59,6 +68,7 @@ object ZposApi {
                     nama = listOf("nama", "name", "nama_produk")
                         .firstNotNullOfOrNull { o.optString(it).takeIf { it.isNotBlank() } } ?: "",
                     barcode = o.optString("barcode").takeIf { it.isNotEmpty() },
+                    barcodeInternal = o.optString("barcode_internal").takeIf { it.isNotEmpty() },
                     harga = formatHarga(o.optString("harga")),
                     satuan = o.optString("satuan").takeIf { it.isNotEmpty() }
                 ))
