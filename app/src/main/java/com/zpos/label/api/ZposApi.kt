@@ -16,12 +16,15 @@ data class Produk(
     val satuan: String?
 )
 
-/** Barcode utk LABEL: utamakan barcode_internal pendek (Code128-C tebal => terbaca 25mm),
- *  lalu barcode asli, lalu generate lokal 6-digit. */
-fun barcodeLabel(p: Produk): String =
-    p.barcodeInternal?.takeIf { it.isNotBlank() }
-        ?: p.barcode?.takeIf { it.isNotBlank() }
-        ?: Code128.generateV3(p.id)
+/** Barcode utk LABEL. preferAsli=false (default): utamakan barcode_internal pendek
+ *  (Code128-C tebal => terbaca 25mm), lalu barcode asli, lalu generate lokal 6-digit.
+ *  preferAsli=true: utamakan barcode asli 13 digit (kode kemasan), lalu internal, lalu generate. */
+fun barcodeLabel(p: Produk, preferAsli: Boolean = false): String {
+    val asli = p.barcode?.takeIf { it.isNotBlank() }
+    val internal = p.barcodeInternal?.takeIf { it.isNotBlank() }
+    return if (preferAsli) asli ?: internal ?: Code128.generateV3(p.id)
+    else internal ?: asli ?: Code128.generateV3(p.id)
+}
 
 object ZposApi {
 

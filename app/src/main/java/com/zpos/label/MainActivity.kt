@@ -67,6 +67,7 @@ class MainActivity : AppCompatActivity() {
     private var proto = "tspl"              // "tspl" (printer label clabel/... ) | "esc"
     private var fontMul = 1                  // 1|2|3 => S/M/L utk TEXT nama & harga label (seragam)
     private var barcodeMode = "1d"           // "1d" (EAN-13/Code128) | "2d" (QR)
+    private var bcSrc = "6"                  // "6" (barcode_internal label) | "13" (barcode asli)
 
     private val permReq =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { _ ->
@@ -85,8 +86,10 @@ class MainActivity : AppCompatActivity() {
         proto = prefs.getString("proto", "tspl") ?: "tspl"
         fontMul = prefs.getInt("fontMul", 1)
         barcodeMode = prefs.getString("barcodeMode", "1d") ?: "1d"
+        bcSrc = prefs.getString("bcSrc", "6") ?: "6"
         b.btnFont.text = "Font: " + fontLabel(fontMul)
         b.btnBarcode.text = barcodeBtnLabel()
+        b.btnBcSrc.text = bcSrcBtnLabel()
         val paper = (prefs.getString("paper", "25x15") ?: "25x15").split("x")
         paperW = paper.getOrNull(0)?.toIntOrNull() ?: 25
         paperH = paper.getOrNull(1)?.toIntOrNull() ?: 15
@@ -125,6 +128,7 @@ class MainActivity : AppCompatActivity() {
         b.btnProto.setOnClickListener { toggleProto() }
         b.btnFont.setOnClickListener { toggleFont() }
         b.btnBarcode.setOnClickListener { toggleBarcode() }
+        b.btnBcSrc.setOnClickListener { toggleBcSrc() }
         b.btnCetak.setOnClickListener { cetak() }
         b.btnCekUpdate.setOnClickListener { cekUpdate(otomatis = false) }
         b.btnKirimLog.setOnClickListener { kirimLog() }
@@ -440,6 +444,16 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, "Barcode: " + barcodeBtnLabel().removePrefix("Barcode: "), Toast.LENGTH_SHORT).show()
     }
 
+    private fun bcSrcBtnLabel() = if (bcSrc == "13") "13 digit" else "6 digit"
+
+    private fun toggleBcSrc() {
+        bcSrc = if (bcSrc == "13") "6" else "13"
+        prefs.edit().putString("bcSrc", bcSrc).apply()
+        b.btnBcSrc.text = bcSrcBtnLabel()
+        Logger.log(this, "barcode", "sumber ${bcSrcBtnLabel()}")
+        Toast.makeText(this, "Cetak barcode: ${bcSrcBtnLabel()}", Toast.LENGTH_SHORT).show()
+    }
+
     private fun setPrinterLabel() {
         b.btnProto.text = btnProtoLabel()
         b.btnPrinter.text = "Printer: " + (printerAddress?.take(6)?.let { "…$it" } ?: "belum pilih")
@@ -496,7 +510,7 @@ class MainActivity : AppCompatActivity() {
             // preview dulu sebelum mencetak (render bitmap label pertama, konfirmasi user)
             val labelPertama = pilih.first()
             val previewBmp = try {
-                val bcP = barcodeLabel(labelPertama)
+                val bcP = barcodeLabel(labelPertama, bcSrc == "13")
                 EscPosLabel.previewBitmap(labelPertama.nama, labelPertama.harga, bcP, paperW, paperH, barcode2d = barcodeMode == "2d")
             } catch (e: Exception) { null }
             if (previewBmp != null) {
@@ -526,14 +540,14 @@ class MainActivity : AppCompatActivity() {
                     if (proto == "tspl") {
                         // printer label (clabel, dll) : TSPL — printer render text+barcode sendiri
                         val data = pilih.map { p ->
-                            val bc = barcodeLabel(p)
+                            val bc = barcodeLabel(p, bcSrc == "13")
                             EscPosLabel.LabelT(p.nama, p.harga, bc)
                         }
                         EscPosLabel.buatRunTSPL(data, paperW, paperH, includeNama = paperH <= 20, fontMul = fontMul, barcode2d = barcodeMode == "2d")
                     } else {
                         val bmpList = pilih.mapIndexed { idx, p ->
                             try {
-                                val bc = barcodeLabel(p)
+                                val bc = barcodeLabel(p, bcSrc == "13")
                                 EscPosLabel.buatLabel(p.nama, p.harga, bc, paperW, paperH)
                             } catch (e: Exception) {
                                 Logger.log(this@MainActivity, "cetak",

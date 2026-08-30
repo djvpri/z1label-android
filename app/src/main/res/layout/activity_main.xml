@@ -160,6 +160,16 @@
                     android:text="1D/2D"
                     android:textSize="12sp"
                     android:minWidth="52dp" />
+
+                <Button
+                    android:id="@+id/btnBcSrc"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:text="6 digit"
+                    android:textSize="12sp"
+                    android:minWidth="52dp" />
             </LinearLayout>
 
             <LinearLayout
