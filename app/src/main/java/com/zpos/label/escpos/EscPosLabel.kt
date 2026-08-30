@@ -208,32 +208,45 @@ object EscPosLabel {
         out.write("SIZE $w,$h$eol".toByteArray(Charsets.US_ASCII))
         out.write("GAP 16,0$eol".toByteArray(Charsets.US_ASCII))
         out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
+        // ---------- layout adaptif (hindari baris saling menimpa saat font diperbesar) ----------
+        // Font TSPL "1" tinggi ~16 dot × multiplier. 2 baris teks + barcode di label pendek
+        // (h kecil) tak selalu muat utk font besar -> turunkan multiplier efektif sampai muat,
+        // lalu posisikan yN/yH/yB dari tinggi font supaya baris tak pernah overlap.
+        var fm = fontMul
+        while ((16 * fm * 2 + 40) > h && fm > 1) fm--
+        val fh = 16 * fm
+        val gap = 6
+        val yN = 4
+        val yH = yN + fh + gap   // baris ke-2 (harga)
+        val yB = yH + fh + gap   // barcode bawah 2 baris teks (ua nama)
+        val yB1 = yN + fh + gap  // barcode bawah 1 baris teks (tanpa nama)
+        val barH = (h - yB - 4).coerceAtLeast(16)  // tinggi barcode = sisa label (≥16)
         for (l in ls) {
             if (barcode2d) {
                 // QR code — padat, module tebal (terbaca di label kecil). TSPL: BARCODE x,y,"QRCODE",height,0,0,module,"data"
                 // NOTE: sebagian clabel menolak height=0 utk QR -> pakai tinggi tersedia (>0).
-                val topY = if (includeNama) 40 else 30
+                val topY = if (includeNama) yB else yB1
                 val (mQ, xQ) = qrGeo(l.bc, w, h, topY)
-                val qrH = (h - topY).coerceAtLeast(30)   // tinggi QR (dot) utk param ke-4
+                val qrH = (h - topY - 4).coerceAtLeast(16)
                 val bcSan = sanitizeTsp(l.bc)
                 if (includeNama) {
-                    out.write("TEXT 4,4,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.nama, namaMaxChar(w, fontMul))}\"$eol".toByteArray(Charsets.US_ASCII))
-                    out.write("TEXT 4,20,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.harga, 20)}\"$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("TEXT 4,$yN,\"1\",0,$fm,$fm,\"${clipTsp(l.nama, namaMaxChar(w, fm))}\"$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("TEXT 4,$yH,\"1\",0,$fm,$fm,\"${clipTsp(l.harga, 20)}\"$eol".toByteArray(Charsets.US_ASCII))
                 } else {
-                    out.write("TEXT 4,4,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("TEXT 4,$yN,\"1\",0,$fm,$fm,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
                 }
                 out.write("BARCODE $xQ,$topY,\"QRCODE\",$qrH,0,0,$mQ,\"$bcSan\"$eol".toByteArray(Charsets.US_ASCII))
             } else {
                 val (bcX, bcN) = barcodeGeo(l.bc, w)
                 if (includeNama) {
-                    // label normal: nama + harga seragam (font 1, multiplier fontMul)
-                    out.write("TEXT 4,4,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.nama, namaMaxChar(w, fontMul))}\"$eol".toByteArray(Charsets.US_ASCII))
-                    out.write("TEXT 4,26,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
-                    out.write("BARCODE $bcX,48,\"${barcodeKodeTsp(l.bc)}\",54,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
+                    // label normal: nama + harga (font 1, multiplier efektif fm) + barcode sisa
+                    out.write("TEXT 4,$yN,\"1\",0,$fm,$fm,\"${clipTsp(l.nama, namaMaxChar(w, fm))}\"$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("TEXT 4,$yH,\"1\",0,$fm,$fm,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("BARCODE $bcX,$yB,\"${barcodeKodeTsp(l.bc)}\",$barH,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
                 } else {
-                    // label kecil: harga (seragam fontMul) + barcode (mengisi bawah)
-                    out.write("TEXT 4,4,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.harga, 28)}\"$eol".toByteArray(Charsets.US_ASCII))
-                    out.write("BARCODE $bcX,30,\"${barcodeKodeTsp(l.bc)}\",76,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
+                    // label kecil: harga + barcode (mengisi bawah, satu baris teks)
+                    out.write("TEXT 4,$yN,\"1\",0,$fm,$fm,\"${clipTsp(l.harga, 28)}\"$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("BARCODE $bcX,$yB1,\"${barcodeKodeTsp(l.bc)}\",$barH,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
                 }
             }
             out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))
