@@ -138,7 +138,8 @@ object EscPosLabel {
         ls: List<LabelT>,
         widthMm: Int = 25,
         heightMm: Int = 15,
-        includeNama: Boolean = true
+        includeNama: Boolean = true,
+        fontMul: Int = 1
     ): ByteArray {
         val w = (widthMm * DOTS_PER_MM).toInt()   // 200
         val h = (heightMm * DOTS_PER_MM).toInt()  // 120
@@ -149,13 +150,13 @@ object EscPosLabel {
         out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
         for (l in ls) {
             if (includeNama) {
-                // label normal: nama + harga + barcode — font tipis (font 1, x1)
-                out.write("TEXT 4,4,\"1\",0,1,1,\"${clipTsp(l.nama, 16)}\"$eol".toByteArray(Charsets.US_ASCII))
-                out.write("TEXT 4,26,\"1\",0,1,2,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
+                // label normal: nama + harga seragam (font 1, multiplier fontMul)
+                out.write("TEXT 4,4,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.nama, 16)}\"$eol".toByteArray(Charsets.US_ASCII))
+                out.write("TEXT 4,26,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
                 out.write("BARCODE 8,48,\"128\",54,0,0,2,2,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
             } else {
-                // label kecil: cukup harga (atas, tipis) + barcode (mengisi bawah)
-                out.write("TEXT 4,4,\"1\",0,1,2,\"${clipTsp(l.harga, 28)}\"$eol".toByteArray(Charsets.US_ASCII))
+                // label kecil: harga (seragam fontMul) + barcode (mengisi bawah)
+                out.write("TEXT 4,4,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.harga, 28)}\"$eol".toByteArray(Charsets.US_ASCII))
                 out.write("BARCODE 8,30,\"128\",76,0,0,2,2,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
             }
             out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))

@@ -61,6 +61,7 @@ class MainActivity : AppCompatActivity() {
     private var paperW = 25                 // mm, default 25x15
     private var paperH = 15
     private var proto = "tspl"              // "tspl" (printer label clabel/... ) | "esc"
+    private var fontMul = 1                  // 1|2|3 => S/M/L utk TEXT nama & harga label (seragam)
 
     private val permReq =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { _ ->
@@ -77,6 +78,8 @@ class MainActivity : AppCompatActivity() {
         printerAddress = prefs.getString("printer", null)
         sortMode = prefs.getString("sort", "baru") ?: "baru"
         proto = prefs.getString("proto", "tspl") ?: "tspl"
+        fontMul = prefs.getInt("fontMul", 1)
+        b.btnFont.text = "Font: " + fontLabel(fontMul)
         val paper = (prefs.getString("paper", "25x15") ?: "25x15").split("x")
         paperW = paper.getOrNull(0)?.toIntOrNull() ?: 25
         paperH = paper.getOrNull(1)?.toIntOrNull() ?: 15
@@ -113,6 +116,7 @@ class MainActivity : AppCompatActivity() {
         b.btnSort.setOnClickListener { pilihSort() }
         b.btnPaper.setOnClickListener { pilihKertas() }
         b.btnProto.setOnClickListener { toggleProto() }
+        b.btnFont.setOnClickListener { toggleFont() }
         b.btnCetak.setOnClickListener { cetak() }
         b.btnCekUpdate.setOnClickListener { cekUpdate(otomatis = false) }
         b.btnKirimLog.setOnClickListener { kirimLog() }
@@ -409,6 +413,15 @@ class MainActivity : AppCompatActivity() {
     private fun btnProtoLabel() =
         if (proto == "tspl") "TSPL Printer Label · aktif" else "ESC/POS Raster · aktif"
 
+    private fun fontLabel(m: Int) = when (m) { 1 -> "S"; 2 -> "M"; else -> "L" }
+
+    private fun toggleFont() {
+        fontMul = if (fontMul >= 3) 1 else fontMul + 1
+        prefs.edit().putInt("fontMul", fontMul).apply()
+        b.btnFont.text = "Font: " + fontLabel(fontMul)
+        Logger.log(this, "font", "ukuran ${fontLabel(fontMul)} (x${fontMul})")
+    }
+
     private fun setPrinterLabel() {
         b.btnProto.text = btnProtoLabel()
         b.btnPrinter.text = "Printer: " + (printerAddress?.take(6)?.let { "…$it" } ?: "belum pilih")
@@ -483,7 +496,7 @@ class MainActivity : AppCompatActivity() {
                                 p.barcode else Code128.generateV3(p.id)
                             EscPosLabel.LabelT(p.nama, p.harga, bc)
                         }
-                        EscPosLabel.buatRunTSPL(data, paperW, paperH, includeNama = paperH <= 20)
+                        EscPosLabel.buatRunTSPL(data, paperW, paperH, includeNama = paperH <= 20, fontMul = fontMul)
                     } else {
                         val bmpList = pilih.mapIndexed { idx, p ->
                             try {
