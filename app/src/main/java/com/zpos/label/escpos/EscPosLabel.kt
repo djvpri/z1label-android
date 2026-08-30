@@ -209,9 +209,9 @@ object EscPosLabel {
         out.write("GAP 16,0$eol".toByteArray(Charsets.US_ASCII))
         out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
         // ---------- layout adaptif (hindari baris menimpa saat font diperbesar) ----------
-        // Nama (1 baris) + harga + barcode selalu ditampilkan utk SEMUA ukuran label (termasuk
-        // 25x15). Turunkan multiplier efektif supaya 3 baris muat label pendek (h kecil), barcode
-        // ambil sisa bawah (dibatasi utk tak keluar label).
+        // Nama (1 baris) + harga + barcode selalu utk SEMUA ukuran label (termasuk 25x15).
+        // Turunkan multiplier efektif supaya 3 baris muat label pendek (h kecil); barcode ambil
+        // sisa bawah dibatasi (≤44) biar muat dalam SIZE & tak kebas dari label.
         val fm = fontMul
             .let { m -> var mm = m; while ((16 * mm * 2 + 40) > h && mm > 1) mm--; mm }
         val fh = 16 * fm
@@ -219,30 +219,28 @@ object EscPosLabel {
         val yN = 4
         val yH = yN + fh + gap   // baris ke-2 (harga)
         val yB = yH + fh + gap   // barcode bawah (nama+harga)
-        val barH = (h - yB - 6).coerceIn(16, 44)   // tinggi barcode: sisa label, tapi ≤44 biar muat & tak overflow
-        // satu print job BATCH utk semua label (SIZE/GAP/CLS di header sekali, zona per label
-        // di-offset tinggi label, PRINT 1,n satu kali) -> tidak ada drift posisi antar label.
-        ls.forEachIndexed { idx, l ->
-            val off = idx * h   // zona label ke-idx dimulai di y = off
-            val yy = { y: Int -> y + off }
+        val barH = (h - yB - 6).coerceIn(16, 44)
+        // NOTE: SATU label = SATU kanvas SIZE. Utk item BEDA harus kirim per-label utuh
+        // (SIZE+GAP+CLS+konten+PRINT 1,1+FORFEED). JANGAN pakai PRINT 1,n + zona offset —
+        // konten zona ke-2+ di luar SIZE akan terpotong, printer cetak salinan item pertama.
+        for (l in ls) {
             if (barcode2d) {
-                val topY = yy(yB)
                 val (mQ, xQ) = qrGeo(l.bc, w, h, yB)
                 val qrH = (h - yB - 6).coerceIn(16, 44)
                 val bcSan = sanitizeTsp(l.bc)
-                out.write("TEXT 4,${yy(yN)},\"1\",0,$fm,$fm,\"${clipTsp(l.nama, namaMaxChar(w, fm))}\"$eol".toByteArray(Charsets.US_ASCII))
-                out.write("TEXT 4,${yy(yH)},\"1\",0,$fm,$fm,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
-                out.write("BARCODE $xQ,$topY,\"QRCODE\",$qrH,0,0,$mQ,\"$bcSan\"$eol".toByteArray(Charsets.US_ASCII))
+                out.write("TEXT 4,$yN,\"1\",0,$fm,$fm,\"${clipTsp(l.nama, namaMaxChar(w, fm))}\"$eol".toByteArray(Charsets.US_ASCII))
+                out.write("TEXT 4,$yH,\"1\",0,$fm,$fm,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
+                out.write("BARCODE $xQ,$yB,\"QRCODE\",$qrH,0,0,$mQ,\"$bcSan\"$eol".toByteArray(Charsets.US_ASCII))
             } else {
                 val (bcX, bcN) = barcodeGeo(l.bc, w)
-                // label: nama (1 baris) + harga + barcode — sisanya (elemen lain) dihilangkan
-                out.write("TEXT 4,${yy(yN)},\"1\",0,$fm,$fm,\"${clipTsp(l.nama, namaMaxChar(w, fm))}\"$eol".toByteArray(Charsets.US_ASCII))
-                out.write("TEXT 4,${yy(yH)},\"1\",0,$fm,$fm,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
-                out.write("BARCODE $bcX,${yy(yB)},\"${barcodeKodeTsp(l.bc)}\",$barH,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
+                // label: nama (1 baris) + harga + barcode — sisanya dihilangkan
+                out.write("TEXT 4,$yN,\"1\",0,$fm,$fm,\"${clipTsp(l.nama, namaMaxChar(w, fm))}\"$eol".toByteArray(Charsets.US_ASCII))
+                out.write("TEXT 4,$yH,\"1\",0,$fm,$fm,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
+                out.write("BARCODE $bcX,$yB,\"${barcodeKodeTsp(l.bc)}\",$barH,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
             }
+            out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))
+            out.write("FORFEED$eol".toByteArray(Charsets.US_ASCII))
         }
-        out.write("PRINT 1,${ls.size}$eol".toByteArray(Charsets.US_ASCII))
-        out.write("FORFEED$eol".toByteArray(Charsets.US_ASCII))
         return out.toByteArray()
     }
 
