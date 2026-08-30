@@ -35,6 +35,9 @@ object Updater {
     /** Pesan error operasi update terakhir (utk log / kirim-WA). Null = sukses. */
     @Volatile var lastErr: String? = null
 
+    /** Hook log detail update (di-set dari MainActivity -> Logger). */
+    @Volatile var onLog: ((String) -> Unit)? = null
+
     /** Cek rilis terbaru dari GitHub. */
     fun cekTerbaru(): Rilis? {
         lastErr = null
@@ -58,9 +61,12 @@ object Updater {
                     .firstOrNull { it.endsWith(".apk") }
             }
             if (apk == null) lastErr = "cek: salah (tak ada asset .apk)"
+            onLog?.invoke(if (apk == null) "cek: rilis ${js.optString("tag_name")} tanpa asset .apk"
+                          else "cek: OK rilis=${js.optString("tag_name")} apk=tak(bisa)${apk.takeLast(24)}")
             Rilis(js.optString("tag_name"), apk)
         } catch (e: Exception) {
             lastErr = "cek: ${e::class.simpleName}: ${e.message}"
+            onLog?.invoke("cek GAGAL: $lastErr")
             null
         } finally {
             conn.disconnect()
@@ -87,6 +93,7 @@ object Updater {
                 val f = File(ctx.cacheDir, "z1label-update.apk")
                 var yangTerak = "?"
                 for (i in 1..attempts) {
+                    onLog?.invoke("unduh: try $i/$attempts $url")
                     try {
                         f.delete()
                         val conn = URL(url).openConnection() as HttpURLConnection
@@ -95,19 +102,26 @@ object Updater {
                             val code = conn.responseCode
                             if (code != 200) {
                                 yangTerak = "HTTP $code"
-                                conn.disconnect()
+                                onLog?.invoke("unduh: try $i HTTP $code")
                                 continue        // retry buat status non-200 juga
                             }
+                            onLog?.invoke("unduh: try $i len=${conn.contentLength}")
                             conn.inputStream.use { inp -> f.outputStream().use { out -> inp.copyTo(out) } }
                         } finally { conn.disconnect() }
-                        return@withContext f                     // sukses
+                        if (f.exists() && f.length() > 0) {
+                            onLog?.invoke("unduh: selesai bytes=${f.length()}")
+                            return@withContext f                     // sukses
+                        }
+                        yangTerak = "file 0 byte"
                     } catch (e: Exception) {
                         yangTerak = "${e::class.simpleName}: ${e.message}"
+                        onLog?.invoke("unduh: try $i GAGAL: $yangTerak")
                         // perlu jeda singkat antar retry, apalagi connection abort
                         Thread.sleep(800L)
                     }
                 }
                 lastErr = "download: GAGAL ${attempts}x — $yangTerak"
+                onLog?.invoke("unduh: SEMUA GAGAL — $lastErr")
                 null
             }
         } catch (e: Exception) {
@@ -127,9 +141,11 @@ object Updater {
                 }
                 try {
                     act.startActivity(i)
+                    onLog?.invoke("installer: dibuka")
                     true
                 } catch (e: Exception) {
                     lastErr = "buka installer: ${e::class.simpleName}: ${e.message}"
+                    onLog?.invoke("installer GAGAL buka: $lastErr")
                     Toast.makeText(act, "Gagal buka installer: ${e.message}", Toast.LENGTH_LONG).show()
                     false
                 }

@@ -83,6 +83,7 @@ class MainActivity : AppCompatActivity() {
         b.btnSort.text = if (sortMode == "baru") "Urut: Terbaru" else "Urut: Nama A-Z"
         b.btnPaper.text = "Kertas ${paperW}x${paperH}"
         b.txtVersion.text = "Z1 Label — versi ${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})"
+        Updater.onLog = { Logger.log(this, "update", it) }
         setPrinterLabel()
         // tap status printer = ganti protokol TSPL <-> ESC (disimpan)
         b.lblStatus.setOnClickListener {
