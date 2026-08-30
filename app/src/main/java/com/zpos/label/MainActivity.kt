@@ -504,7 +504,9 @@ class MainActivity : AppCompatActivity() {
         override fun onBindViewHolder(h: VH, pos: Int) {
             val p = items[pos]
             h.r.chk.isChecked = p.id in selected
-            h.r.txtNama.text = p.nama.trim().ifEmpty { "Produk #${p.id}" }
+            val nm = p.nama.trim()
+            if (nm.isEmpty()) Logger.log(h.itemView.context, "produk", "nama-kosong id=${p.id} (idx=$pos)")
+            h.r.txtNama.text = nm.ifEmpty { "Produk #${if (p.id > 0) p.id else pos + 1}" }
             h.itemView.setOnClickListener { onToggle(p.id) }
         }
     }
