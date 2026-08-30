@@ -197,9 +197,9 @@ class MainActivity : AppCompatActivity() {
                             }
                             withContext(Dispatchers.Main) {
                                 Logger.log(this@MainActivity, "update",
-                                    if (ok) "unduh+install berhasil"
-                                    else "unduh/install GAGAL: ${Updater.lastErr ?: url}")
-                                b.lblStatus.text = if (ok) "Unduh selesai — install di sistem" else "Unduh gagal: ${Updater.lastErr ?: ""}"
+                                    if (ok) "unduh selesai — installer dibuka (v${rilis.versi}); tekan Install utk terpasang"
+                                    else "unduh GAGAL: ${Updater.lastErr ?: url}")
+                                b.lblStatus.text = if (ok) "Installer dibuka — tekan Install utk terpasang" else "Unduh gagal: ${Updater.lastErr ?: ""}"
                             }
                         }
                     }
@@ -504,7 +504,7 @@ class MainActivity : AppCompatActivity() {
         override fun onBindViewHolder(h: VH, pos: Int) {
             val p = items[pos]
             h.r.chk.isChecked = p.id in selected
-            h.r.txtNama.text = p.nama
+            h.r.txtNama.text = p.nama.trim().ifEmpty { "Produk #${p.id}" }
             h.itemView.setOnClickListener { onToggle(p.id) }
         }
     }

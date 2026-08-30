@@ -115,19 +115,29 @@ object Updater {
             null
         } ?: return false
         val act = ctx as? Activity ?: return false
-        act.runOnUiThread {
-            try {
+        // buka system installer di MAIN thread; return = apakah installer berhasil dibuka.
+        // (Jangan `return true` blind: ACTION_VIEW bisa gagal -> dulu log 'berhasil' palsu.)
+        val terbuka = try {
+            withContext(Dispatchers.Main) {
                 val uri = FileProvider.getUriForFile(act, "${act.packageName}.fileprovider", file)
                 val i = Intent(Intent.ACTION_VIEW).apply {
                     setDataAndType(uri, "application/vnd.android.package-archive")
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
-                act.startActivity(i)
-            } catch (e: Exception) {
-                Toast.makeText(act, "Gagal buka installer: ${e.message}", Toast.LENGTH_LONG).show()
+                try {
+                    act.startActivity(i)
+                    true
+                } catch (e: Exception) {
+                    lastErr = "buka installer: ${e::class.simpleName}: ${e.message}"
+                    Toast.makeText(act, "Gagal buka installer: ${e.message}", Toast.LENGTH_LONG).show()
+                    false
+                }
             }
+        } catch (e: Exception) {
+            lastErr = "buka installer: ${e::class.simpleName}: ${e.message}"
+            false
         }
-        return true
+        return terbuka
     }
 }

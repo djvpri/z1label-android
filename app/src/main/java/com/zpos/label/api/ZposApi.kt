@@ -56,7 +56,8 @@ object ZposApi {
                 val o = arr.getJSONObject(i)
                 list.add(Produk(
                     id = o.optLong("id"),
-                    nama = o.optString("nama"),
+                    nama = listOf("nama", "name", "nama_produk")
+                        .firstNotNullOfOrNull { o.optString(it).takeIf { it.isNotBlank() } } ?: "",
                     barcode = o.optString("barcode").takeIf { it.isNotEmpty() },
                     harga = formatHarga(o.optString("harga")),
                     satuan = o.optString("satuan").takeIf { it.isNotEmpty() }
