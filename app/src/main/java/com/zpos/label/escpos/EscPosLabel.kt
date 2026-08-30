@@ -58,6 +58,49 @@ object EscPosLabel {
         return bmp
     }
 
+    /**
+     * Preview label utk ditampilkan di layar sebelum cetak. Render nama+harga (Paint,
+     * mirror buatLabel) + BARCODE SESUAI proto tspl: EAN-13 bitmap (2 dot/modul, penuh
+     * lebar) utk 13-digit, Code128 utk lainnya. Jadi preview = yg akan tercetak TSPL.
+     */
+    fun previewBitmap(
+        nama: String,
+        harga: String,
+        barcode: String,
+        widthMm: Int = 25,
+        heightMm: Int = 15
+    ): Bitmap {
+        val w = (widthMm * DOTS_PER_MM).toInt().coerceAtLeast(150)
+        val h = (heightMm * DOTS_PER_MM).toInt().coerceAtLeast(100)
+        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val c = Canvas(bmp)
+        c.drawColor(Color.WHITE)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
+        val sc = w / 25f
+        paint.typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
+        paint.textAlign = Paint.Align.CENTER
+        paint.textSize = sc * 2.2f
+        c.drawText(clipText(nama, paint, w - (sc * 2)), w / 2f, sc * 3f, paint)
+        paint.textSize = sc * 3.2f
+        c.drawText(harga, w / 2f, sc * 7.4f, paint)
+
+        val topBar = (h - (sc * 8.4f)).toInt().coerceAtLeast(30)
+        val bcPaint = Paint().apply { color = Color.BLACK }
+        if (barcode.length == 13 && barcode.all { it.isDigit() }) {
+            val ndot = (w / Ean13.TOTAL_MODUL).coerceAtLeast(2)
+            val bw = 95 * ndot
+            val x0 = ((w - bw) / 2).coerceAtLeast(1)
+            val hpx = (h - topBar - (sc * 1f).toInt()).coerceAtLeast(20)
+            for (b in Ean13.encodeBars(barcode)) {
+                val xa = x0 + b.xModul * ndot
+                c.drawRect(xa.toFloat(), topBar.toFloat(), (xa + b.wModul * ndot).toFloat(), (topBar + hpx).toFloat(), bcPaint)
+            }
+        } else {
+            drawBarcode(c, Code128.encodeCDigits(barcode) ?: Code128.encodeBText(barcode), h - topBar, h, sc, w)
+        }
+        return bmp
+    }
+
     private fun drawBarcode(
         c: Canvas,
         bc: Code128.Encoded,

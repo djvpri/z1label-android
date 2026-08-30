@@ -7,11 +7,13 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -37,6 +39,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
@@ -475,6 +478,22 @@ class MainActivity : AppCompatActivity() {
 
             Logger.log(this@MainActivity, "cetak", "mulai ${pilih.size} label, kertas ${paperW}x${paperH}mm, print ${printerAddress ?: "-"}")
 
+            // preview dulu sebelum mencetak (render bitmap label pertama, konfirmasi user)
+            val labelPertama = pilih.first()
+            val previewBmp = try {
+                val bcP = labelPertama.barcode?.takeIf { it.isNotBlank() } ?: Code128.generateV3(labelPertama.id)
+                EscPosLabel.previewBitmap(labelPertama.nama, labelPertama.harga, bcP, paperW, paperH)
+            } catch (e: Exception) { null }
+            if (previewBmp != null) {
+                val lanjut = konfirmasiPrintPreview(previewBmp, pilih.size)
+                if (!lanjut) {
+                    withContext(Dispatchers.Main) {
+                        b.lblStatus.text = "Cetak dibatalkan (pratinjau)"; b.btnCetak.isEnabled = true
+                    }
+                    return@launch
+                }
+            }
+
             // konek bila belum (auto-connect mungkin sudah buat); socket dijaga hidup antar cetak
             if (!BluetoothPrinter.connected()) {
                 val errConn = BluetoothPrinter.connect(addr)
@@ -536,6 +555,32 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             // socket TIDAK ditutup: biar cetak berikutnya langsung (hemat waktu koneksi)
+        }
+    }
+
+    /**
+     * Tampilkan pratinjau (bitmap) + tombol Cetak/Batal sebelum kirim ke printer.
+     * suspend: menanti pilihan user; true = lanjut cetak, false = batal.
+     */
+    private suspend fun konfirmasiPrintPreview(bitmap: Bitmap, jumlah: Int): Boolean {
+        return suspendCancellableCoroutine { cont ->
+            withContext(Dispatchers.Main) {
+                val img = ImageView(this@MainActivity).apply {
+                    setImageBitmap(bitmap)
+                    adjustViewBounds = true
+                    maxWidth = (resources.displayMetrics.density * 260).toInt()
+                    maxHeight = (resources.displayMetrics.density * 200).toInt()
+                    setPadding(24, 16, 24, 0)
+                }
+                val dlg = AlertDialog.Builder(this@MainActivity)
+                    .setTitle("Pratinjau — Cetak $jumlah label?")
+                    .setView(img)
+                    .setPositiveButton("Cetak") { _, _ -> if (cont.isActive) cont.resume(true) }
+                    .setNegativeButton("Batal") { _, _ -> if (cont.isActive) cont.resume(false) }
+                    .setOnCancelListener { if (cont.isActive) cont.resume(false) }
+                    .create()
+                dlg.show()
+            }
         }
     }
 
