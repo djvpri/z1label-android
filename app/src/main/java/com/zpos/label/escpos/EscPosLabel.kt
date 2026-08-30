@@ -6,6 +6,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
 import com.zpos.label.bc.Code128
+import com.zpos.label.bc.Ean13
 import java.io.ByteArrayOutputStream
 
 /**
@@ -149,16 +150,29 @@ object EscPosLabel {
         out.write("GAP 16,0$eol".toByteArray(Charsets.US_ASCII))
         out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
         for (l in ls) {
-            val (bcX, bcN) = barcodeGeo(l.bc, w)
-            if (includeNama) {
-                // label normal: nama + harga seragam (font 1, multiplier fontMul)
-                out.write("TEXT 4,4,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.nama, 16)}\"$eol".toByteArray(Charsets.US_ASCII))
-                out.write("TEXT 4,26,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
-                out.write("BARCODE $bcX,48,\"${barcodeKodeTsp(l.bc)}\",54,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
+            if (barcodeKodeTsp(l.bc) == "EAN13") {
+                // EAN-13 sebagai BMP penuh-lebar: BARCODE internal narrow=1 => 95 modul = 47%
+                // lebar label; bitmap 2 dot/modul => 190 dot = 95% (mengisi sticker) + bar >=2 dot
+                val ndot = (w / Ean13.TOTAL_MODUL).coerceAtLeast(2)
+                val h = if (includeNama) 54 else 76
+                val bmp = Ean13.toBitmap(Ean13.encodeBars(sanitizeTsp(l.bc)), ndot, w, h)
+                val hex = StringBuilder()
+                for (b in bmp) hex.append(String.format("%02X", b.toInt() and 0xFF))
+                val bpb = (w + 7) / 8
+                // BITMAP x,y,width_bytes,height_dots,"hex" — bitmap penuh-lebar, posisi kiri
+                out.write("BITMAP ${(w - 95 * ndot) / 2},${if (includeNama) 48 else 30},$bpb,$h,\"$hex\"$eol".toByteArray(Charsets.US_ASCII))
             } else {
-                // label kecil: harga (seragam fontMul) + barcode (mengisi bawah)
-                out.write("TEXT 4,4,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.harga, 28)}\"$eol".toByteArray(Charsets.US_ASCII))
-                out.write("BARCODE $bcX,30,\"${barcodeKodeTsp(l.bc)}\",76,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
+                val (bcX, bcN) = barcodeGeo(l.bc, w)
+                if (includeNama) {
+                    // label normal: nama + harga seragam (font 1, multiplier fontMul)
+                    out.write("TEXT 4,4,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.nama, 16)}\"$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("TEXT 4,26,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("BARCODE $bcX,48,\"${barcodeKodeTsp(l.bc)}\",54,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
+                } else {
+                    // label kecil: harga (seragam fontMul) + barcode (mengisi bawah)
+                    out.write("TEXT 4,4,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.harga, 28)}\"$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("BARCODE $bcX,30,\"${barcodeKodeTsp(l.bc)}\",76,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
+                }
             }
             out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))
             out.write("FORFEED$eol".toByteArray(Charsets.US_ASCII))
