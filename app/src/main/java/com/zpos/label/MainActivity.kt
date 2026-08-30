@@ -497,7 +497,7 @@ class MainActivity : AppCompatActivity() {
             val labelPertama = pilih.first()
             val previewBmp = try {
                 val bcP = barcodeLabel(labelPertama)
-      ...[truncated]
+                EscPosLabel.previewBitmap(labelPertama.nama, labelPertama.harga, bcP, paperW, paperH, barcode2d = barcodeMode == "2d")
             } catch (e: Exception) { null }
             if (previewBmp != null) {
                 val lanjut = konfirmasiPrintPreview(previewBmp, pilih.size)
