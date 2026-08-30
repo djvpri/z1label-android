@@ -240,7 +240,15 @@ object EscPosLabel {
             val x = ((wDots - bw) / 2).coerceAtLeast(1)
             return x to n
         }
-        return 8 to 2   // Code128 6-digit
+        // Code128 (barcode bebas panjang): hitung LEBAR NYATA dr encoder supaya muat label.
+        // Sebelumnya hardcode narrow=2 -> barcode panjang (8+ digit) overlebar -> terpotong/
+        // tak muncul. Kini narrow = w / totalModul (>=1) sehingga sebanyak-banyaknya masuk.
+        val total = (Code128.encodeCDigits(bc) ?: Code128.encodeBText(bc)).totalModul
+            .coerceAtLeast(10)   // guard: totalModul 0
+        val n = ((wDots - 4) / total).coerceIn(1, 4)   // utk pendek tetap tebal (<=4)
+        val bw = total * n
+        val x = ((wDots - bw) / 2).coerceAtLeast(1)
+        return x to n
     }
 
     /** Buang karakter yg bisa merusak perintah TSPL. */
