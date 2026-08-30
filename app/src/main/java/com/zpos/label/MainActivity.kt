@@ -108,6 +108,7 @@ class MainActivity : AppCompatActivity() {
         b.btnPrinter.setOnClickListener { pilihPrinter() }
         b.btnSort.setOnClickListener { pilihSort() }
         b.btnPaper.setOnClickListener { pilihKertas() }
+        b.btnProto.setOnClickListener { toggleProto() }
         b.btnCetak.setOnClickListener { cetak() }
         b.btnCekUpdate.setOnClickListener { cekUpdate(otomatis = false) }
         b.btnKirimLog.setOnClickListener { kirimLogWa() }
@@ -377,7 +378,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun btnProtoLabel() =
+        if (proto == "tspl") "TSPL Printer Label · aktif" else "ESC/POS Raster · aktif"
+
     private fun setPrinterLabel() {
+        b.btnProto.text = btnProtoLabel()
         b.btnPrinter.text = "Printer: " + (printerAddress?.take(6)?.let { "…$it" } ?: "belum pilih")
         BluetoothPrinter.onStateChange = { ok ->
             runOnUiThread {
@@ -388,6 +393,14 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+    }
+
+    private fun toggleProto() {
+        proto = if (proto == "tspl") "esc" else "tspl"
+        prefs.edit().putString("proto", proto).apply()
+        b.btnProto.text = btnProtoLabel()
+        Logger.log(this, "proto", "ganti ke $proto")
+        Toast.makeText(this, "Protokol: ${btnProtoLabel().substringBefore(" · ")}", Toast.LENGTH_SHORT).show()
     }
 
     private fun bluetoothOk(ask: Boolean): Boolean {
