@@ -505,7 +505,6 @@ class MainActivity : AppCompatActivity() {
             val p = items[pos]
             h.r.chk.isChecked = p.id in selected
             h.r.txtNama.text = p.nama
-            h.r.txtBarcode.text = p.barcode?.let { "Barcode: $it" } ?: "Barcode: otomatis"
             h.itemView.setOnClickListener { onToggle(p.id) }
         }
     }
