@@ -153,11 +153,11 @@ object EscPosLabel {
                 // label normal: nama + harga seragam (font 1, multiplier fontMul)
                 out.write("TEXT 4,4,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.nama, 16)}\"$eol".toByteArray(Charsets.US_ASCII))
                 out.write("TEXT 4,26,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
-                out.write("BARCODE 8,48,\"${barcodeKodeTsp(l.bc)}\",54,0,0,2,2,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
+                out.write("BARCODE ${if (barcodeKodeTsp(l.bc) == "EAN13") 37 else 8},48,\"${barcodeKodeTsp(l.bc)}\",54,0,0,${barcodeNw(l.bc)},\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
             } else {
                 // label kecil: harga (seragam fontMul) + barcode (mengisi bawah)
                 out.write("TEXT 4,4,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.harga, 28)}\"$eol".toByteArray(Charsets.US_ASCII))
-                out.write("BARCODE 8,30,\"${barcodeKodeTsp(l.bc)}\",76,0,0,2,2,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
+                out.write("BARCODE ${if (barcodeKodeTsp(l.bc) == "EAN13") 37 else 8},30,\"${barcodeKodeTsp(l.bc)}\",76,0,0,${barcodeNw(l.bc)},\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
             }
             out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))
             out.write("FORFEED$eol".toByteArray(Charsets.US_ASCII))
@@ -165,9 +165,17 @@ object EscPosLabel {
         return out.toByteArray()
     }
 
-    /** Pilih tipe barcode TSPL: 13-digit (EAN-13, ~113 module sempit) atau Code128 utk lain. */
+    /** Pilih tipe barcode TSPL: 13-digit (EAN-13) atau Code128 utk yg lain. */
     private fun barcodeKodeTsp(bc: String): String =
         if (bc.length == 13 && bc.all { it.isDigit() }) "EAN13" else "128"
+
+    /**
+     * narrow,wide utk BARCODE — disesuaikan agar barcode MENYESUAIKAN lebar kertas.
+     * EAN-13 = 113 module; narrow=1 (@203dpi) -> 113+quiet < label 200 dot => tak terpotong
+     * (narrow=2 -> 226 dot > 200 => TERPOTONG kanan). Code128 internal 6-digit short -> 2,2 tebal.
+     */
+    private fun barcodeNw(bc: String): String =
+        if (bc.length == 13 && bc.all { it.isDigit() }) "1,1" else "2,2"
 
     /** Buang karakter yg bisa merusak perintah TSPL. */
     private fun sanitizeTsp(s: String): String = s.filter { it in '0'..'9' || it in 'A'..'Z' || it in 'a'..'z' || it == ' ' }
