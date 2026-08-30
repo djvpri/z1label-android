@@ -112,7 +112,7 @@ object EscPosLabel {
         return out.toByteArray()
     }
 
-    /** Rangkaian beberapa label: feed + raster per label + cut/final feed. */
+    /** Rangkaian beberapa label: feed + raster per label + cut/final feed (ESC/POS). */
     fun buatRun(labels: List<Bitmap>): ByteArray {
         val out = ByteArrayOutputStream()
         for (b in labels) {
@@ -123,5 +123,38 @@ object EscPosLabel {
         }
         out.write(byteArrayOf(0x1c, 0x56, 0x00)) // ESC V (partial cut), tak semua
         return out.toByteArray()
+    }
+
+    // ---- TSPL (printer label clabel/Zebra/Xprinter/GODEX) ----
+
+    data class LabelT(val nama: String, val harga: String, val bc: String)
+
+    /**
+     * Bangun urutan perintah TSPL utk label 25x15mm: SIZE/GAP/CLS per label,
+     * teks nama+harga pakai font built-in, barcode pakai BARCODE built-in
+     * (printer render sendiri, tajam & hemat). Koordinat dalam dot (203 dpi).
+     */
+    fun buatRunTSPL(ls: List<LabelT>, widthMm: Int = 25, heightMm: Int = 15): ByteArray {
+        val w = (widthMm * DOTS_PER_MM).toInt()   // 200
+        val h = (heightMm * DOTS_PER_MM).toInt()  // 120
+        val out = ByteArrayOutputStream()
+        out.write("SIZE $w,$h\n".toByteArray(Charsets.US_ASCII))
+        out.write("GAP 16,0\nCLS\n".toByteArray(Charsets.US_ASCII))
+        for (l in ls) {
+            out.write("TEXT 4,4,\"1\",0,2,2,\"${clipTsp(l.nama, 16)}\"\n".toByteArray(Charsets.US_ASCII))
+            out.write("TEXT 4,28,\"3\",0,2,2,\"${clipTsp(l.harga, 24)}\"\n".toByteArray(Charsets.US_ASCII))
+            out.write("BARCODE 8,50,\"128\",60,0,0,2,\"${sanitizeTsp(l.bc)}\"\n".toByteArray(Charsets.US_ASCII))
+            out.write("PRINT 1,1\n".toByteArray(Charsets.US_ASCII))
+        }
+        return out.toByteArray()
+    }
+
+    /** Buang karakter yg bisa merusak perintah TSPL. */
+    private fun sanitizeTsp(s: String): String = s.filter { it in '0'..'9' || it in 'A'..'Z' || it in 'a'..'z' || it == ' ' }
+
+    /** Clip teks agar tak melebihi lebar label (est. per-char utk font multiplier2). */
+    private fun clipTsp(s: String, maxChars: Int): String {
+        val clean = sanitizeTsp(s)
+        return if (clean.length > maxChars) clean.take(maxChars - 1) + "." else clean
     }
 }

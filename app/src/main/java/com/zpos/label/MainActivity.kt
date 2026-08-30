@@ -57,6 +57,7 @@ class MainActivity : AppCompatActivity() {
     private var sortMode = "baru"          // "baru" (id turun) | "nama" (A-Z)
     private var paperW = 25                 // mm, default 25x15
     private var paperH = 15
+    private var proto = "tspl"              // "tspl" (printer label clabel/... ) | "esc"
 
     private val permReq =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { _ ->
@@ -72,6 +73,7 @@ class MainActivity : AppCompatActivity() {
         prefs = getSharedPreferences("z1label", Context.MODE_PRIVATE)
         printerAddress = prefs.getString("printer", null)
         sortMode = prefs.getString("sort", "baru") ?: "baru"
+        proto = prefs.getString("proto", "tspl") ?: "tspl"
         val paper = (prefs.getString("paper", "25x15") ?: "25x15").split("x")
         paperW = paper.getOrNull(0)?.toIntOrNull() ?: 25
         paperH = paper.getOrNull(1)?.toIntOrNull() ?: 15
@@ -79,6 +81,13 @@ class MainActivity : AppCompatActivity() {
         b.btnPaper.text = "Kertas ${paperW}x${paperH}"
         b.txtVersion.text = "Z1 Label — versi ${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})"
         setPrinterLabel()
+        // tap status printer = ganti protokol TSPL <-> ESC (disimpan)
+        b.lblStatus.setOnClickListener {
+            proto = if (proto == "tspl") "esc" else "tspl"
+            prefs.edit().putString("proto", proto).apply()
+            b.lblStatus.text = "Protokol: ${if (proto == "tspl") "TSPL (label printer)" else "ESC/POS raster"}"
+            Logger.log(this, "proto", "ganti ke $proto")
+        }
 
         adapter = ProdukAdapter { id ->
             if (id in selected) selected.remove(id) else selected.add(id)
@@ -423,21 +432,31 @@ class MainActivity : AppCompatActivity() {
 
             // bangun + kirim label; tiap tahap di-cover try/catch utk tangkap kenapa gagal
             try {
-                val bmpList = pilih.mapIndexed { idx, p ->
-                    try {
-                        val bc = if (p.barcode != null && p.barcode.length == 6 && p.barcode.all { it.isDigit() })
-                            p.barcode else Code128.generateV3(p.id)
-                        EscPosLabel.buatLabel(p.nama, p.harga, bc, paperW, paperH)
-                    } catch (e: Exception) {
-                        Logger.log(this@MainActivity, "cetak",
-                            "gagal bulat-label #$idx (${p.nama} id ${p.id} bc ${p.barcode}): ${e::class.simpleName}: ${e.message}")
-                        throw e
-                    }
-                }
                 val run = try {
-                    EscPosLabel.buatRun(bmpList)
+                    if (proto == "tspl") {
+                        // printer label (clabel, dll) : TSPL — printer render text+barcode sendiri
+                        val data = pilih.map { p ->
+                            val bc = if (p.barcode != null && p.barcode.length == 6 && p.barcode.all { it.isDigit() })
+                                p.barcode else Code128.generateV3(p.id)
+                            EscPosLabel.LabelT(p.nama, p.harga, bc)
+                        }
+                        EscPosLabel.buatRunTSPL(data, paperW, paperH)
+                    } else {
+                        val bmpList = pilih.mapIndexed { idx, p ->
+                            try {
+                                val bc = if (p.barcode != null && p.barcode.length == 6 && p.barcode.all { it.isDigit() })
+                                    p.barcode else Code128.generateV3(p.id)
+                                EscPosLabel.buatLabel(p.nama, p.harga, bc, paperW, paperH)
+                            } catch (e: Exception) {
+                                Logger.log(this@MainActivity, "cetak",
+                                    "gagal bulat-label #$idx (${p.nama} id ${p.id} bc ${p.barcode}): ${e::class.simpleName}: ${e.message}")
+                                throw e
+                            }
+                        }
+                        EscPosLabel.buatRun(bmpList)
+                    }
                 } catch (e: Exception) {
-                    Logger.log(this@MainActivity, "cetak", "gagal buatRun: ${e::class.simpleName}: ${e.message}")
+                    Logger.log(this@MainActivity, "cetak", "gagal buatRun($proto): ${e::class.simpleName}: ${e.message}")
                     throw e
                 }
                 val errWr = BluetoothPrinter.write(run)
@@ -447,7 +466,7 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     val hex = run.take(8).joinToString("") { "%02X".format(it) }
                     Logger.log(this@MainActivity, "cetak",
-                        "[$versiApp] kirim OK ${pilih.size} label, ${run.size} byte, head[0x$hex], connected=${BluetoothPrinter.connected()}")
+                        "[$versiApp] kirim OK ${pilih.size} label, ${run.size} byte, proto=$proto, head[0x$hex], connected=${BluetoothPrinter.connected()}")
                 }
                 withContext(Dispatchers.Main) {
                     b.lblStatus.text = if (errWr != null) "Cetak gagal: $errWr"
