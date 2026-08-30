@@ -41,6 +41,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
 
 class MainActivity : AppCompatActivity() {
 
@@ -562,9 +563,9 @@ class MainActivity : AppCompatActivity() {
      * Tampilkan pratinjau (bitmap) + tombol Cetak/Batal sebelum kirim ke printer.
      * suspend: menanti pilihan user; true = lanjut cetak, false = batal.
      */
-    private suspend fun konfirmasiPrintPreview(bitmap: Bitmap, jumlah: Int): Boolean {
-        return suspendCancellableCoroutine { cont ->
-            withContext(Dispatchers.Main) {
+    private suspend fun konfirmasiPrintPreview(bitmap: Bitmap, jumlah: Int): Boolean =
+        withContext(Dispatchers.Main) {
+            suspendCancellableCoroutine { cont ->
                 val img = ImageView(this@MainActivity).apply {
                     setImageBitmap(bitmap)
                     adjustViewBounds = true
@@ -582,7 +583,6 @@ class MainActivity : AppCompatActivity() {
                 dlg.show()
             }
         }
-    }
 
     // ---- Adapter ----
     class ProdukAdapter(private val onToggle: (Long) -> Unit) :
