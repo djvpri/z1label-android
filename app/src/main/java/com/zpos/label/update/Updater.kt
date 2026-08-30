@@ -87,37 +87,42 @@ object Updater {
     /** Download APK ke cache lalu minta install (buka system installer). */
     suspend fun unduhDanInstall(ctx: Context, url: String): Boolean {
         lastErr = null
-        val attempts = 3   // retry: "connection abort / reset" sering transient
+        val attempts = 6   // retry: jaringan flaky (Socket abort / DNS) sering butuh coba ulang
         val file = try {
             withContext(Dispatchers.IO) {
                 val f = File(ctx.cacheDir, "z1label-update.apk")
                 var yangTerak = "?"
                 for (i in 1..attempts) {
-                    onLog?.invoke("unduh: try $i/$attempts $url")
+                    val pos = if (i > 1) f.length() else 0L   // resume dari byte yang sudah ada
+                    onLog?.invoke("unduh: try $i/$attempts byte=$pos $url")
                     try {
-                        f.delete()
                         val conn = URL(url).openConnection() as HttpURLConnection
-                        conn.connectTimeout = 20000; conn.readTimeout = 60000
+                        conn.connectTimeout = 20000; conn.readTimeout = 30000
+                        if (pos > 0) conn.setRequestProperty("Range", "bytes=$pos-")
                         try {
                             val code = conn.responseCode
-                            if (code != 200) {
+                            // 200 = server tak dukung Range (mulai 0); 206 = lanjut append
+                            if (code != 200 && code != 206) {
                                 yangTerak = "HTTP $code"
                                 onLog?.invoke("unduh: try $i HTTP $code")
-                                continue        // retry buat status non-200 juga
+                                continue
                             }
-                            onLog?.invoke("unduh: try $i len=${conn.contentLength}")
-                            conn.inputStream.use { inp -> f.outputStream().use { out -> inp.copyTo(out) } }
+                            val total = conn.getHeaderFieldInt("Content-Length", -1)
+                            onLog?.invoke("unduh: try $i code=$code len=$total")
+                            // 206=append ke akhir (resume dari pos), 200=overwrite dari 0 (fresh)
+                            java.io.FileOutputStream(f, code == 206).use { out ->
+                                conn.inputStream.copyTo(out)
+                            }
+                            if (f.exists() && f.length() > 0) {
+                                onLog?.invoke("unduh: selesai bytes=${f.length()}")
+                                return@withContext f                     // sukses
+                            }
+                            yangTerak = "file 0 byte"
                         } finally { conn.disconnect() }
-                        if (f.exists() && f.length() > 0) {
-                            onLog?.invoke("unduh: selesai bytes=${f.length()}")
-                            return@withContext f                     // sukses
-                        }
-                        yangTerak = "file 0 byte"
                     } catch (e: Exception) {
                         yangTerak = "${e::class.simpleName}: ${e.message}"
-                        onLog?.invoke("unduh: try $i GAGAL: $yangTerak")
-                        // perlu jeda singkat antar retry, apalagi connection abort
-                        Thread.sleep(800L)
+                        onLog?.invoke("unduh: try $i GAGAL (pos=$pos, file=${f.length()}B): $yangTerak")
+                        Thread.sleep(1200L)
                     }
                 }
                 lastErr = "download: GAGAL ${attempts}x — $yangTerak"
