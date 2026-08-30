@@ -455,7 +455,7 @@ class MainActivity : AppCompatActivity() {
                                 p.barcode else Code128.generateV3(p.id)
                             EscPosLabel.LabelT(p.nama, p.harga, bc)
                         }
-                        EscPosLabel.buatRunTSPL(data, paperW, paperH)
+                        EscPosLabel.buatRunTSPL(data, paperW, paperH, includeNama = paperH <= 20)
                     } else {
                         val bmpList = pilih.mapIndexed { idx, p ->
                             try {
