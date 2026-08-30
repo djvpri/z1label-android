@@ -149,14 +149,14 @@ object EscPosLabel {
         out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
         for (l in ls) {
             if (includeNama) {
-                // label normal: nama + harga + barcode
-                out.write("TEXT 4,4,\"1\",0,2,2,\"${clipTsp(l.nama, 16)}\"$eol".toByteArray(Charsets.US_ASCII))
-                out.write("TEXT 4,28,\"3\",0,2,2,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
-                out.write("BARCODE 8,50,\"128\",58,0,0,2,2,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
+                // label normal: nama + harga + barcode — font tipis (font 1, x1)
+                out.write("TEXT 4,4,\"1\",0,1,1,\"${clipTsp(l.nama, 16)}\"$eol".toByteArray(Charsets.US_ASCII))
+                out.write("TEXT 4,26,\"1\",0,1,2,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
+                out.write("BARCODE 8,48,\"128\",54,0,0,2,2,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
             } else {
-                // label kecil: cukup harga (atas) + barcode (mengisi bawah)
-                out.write("TEXT 4,6,\"3\",0,2,2,\"${clipTsp(l.harga, 28)}\"$eol".toByteArray(Charsets.US_ASCII))
-                out.write("BARCODE 8,38,\"128\",68,0,0,2,2,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
+                // label kecil: cukup harga (atas, tipis) + barcode (mengisi bawah)
+                out.write("TEXT 4,4,\"1\",0,1,2,\"${clipTsp(l.harga, 28)}\"$eol".toByteArray(Charsets.US_ASCII))
+                out.write("BARCODE 8,30,\"128\",76,0,0,2,2,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
             }
             out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))
             out.write("FORFEED$eol".toByteArray(Charsets.US_ASCII))
