@@ -68,7 +68,8 @@ object EscPosLabel {
         harga: String,
         barcode: String,
         widthMm: Int = 25,
-        heightMm: Int = 15
+        heightMm: Int = 15,
+        barcode2d: Boolean = false
     ): Bitmap {
         val w = (widthMm * DOTS_PER_MM).toInt().coerceAtLeast(150)
         val h = (heightMm * DOTS_PER_MM).toInt().coerceAtLeast(100)
@@ -86,7 +87,21 @@ object EscPosLabel {
 
         val topBar = (h - (sc * 8.4f)).toInt().coerceAtLeast(30)
         val bcPaint = Paint().apply { color = Color.BLACK }
-        if (barcode.length == 13 && barcode.all { it.isDigit() }) {
+        if (barcode2d) {
+            // QR via ZXing — render sesuai mode 2D (padat, tebal) sama seperti print
+            val (mQ, xQ) = previewQrGeo(barcode, w, h, topBar)
+            val sizePx = 29 * mQ
+            val qr = com.google.zxing.qrcode.QRCodeWriter().encode(
+                barcode, com.google.zxing.BarcodeFormat.QR_CODE, sizePx, sizePx,
+                mapOf(com.google.zxing.EncodeHintType.MARGIN to 1)
+            )
+            val px = xQ
+            for (yy in 0 until sizePx) {
+                for (xx in 0 until sizePx) {
+                    if (qr.get(xx, yy, 0)) c.drawRect((px + xx).toFloat(), (topBar + yy).toFloat(), (px + xx + 1).toFloat(), (topBar + yy + 1).toFloat(), bcPaint)
+                }
+            }
+        } else if (barcode.length == 13 && barcode.all { it.isDigit() }) {
             val ndot = (w / Ean13.TOTAL_MODUL).coerceAtLeast(2)
             val bw = 95 * ndot
             val x0 = ((w - bw) / 2).coerceAtLeast(1)
@@ -183,7 +198,8 @@ object EscPosLabel {
         widthMm: Int = 25,
         heightMm: Int = 15,
         includeNama: Boolean = true,
-        fontMul: Int = 1
+        fontMul: Int = 1,
+        barcode2d: Boolean = false
     ): ByteArray {
         val w = (widthMm * DOTS_PER_MM).toInt()   // 200
         val h = (heightMm * DOTS_PER_MM).toInt()  // 120
@@ -193,16 +209,30 @@ object EscPosLabel {
         out.write("GAP 16,0$eol".toByteArray(Charsets.US_ASCII))
         out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
         for (l in ls) {
-            val (bcX, bcN) = barcodeGeo(l.bc, w)
-            if (includeNama) {
-                // label normal: nama + harga seragam (font 1, multiplier fontMul)
-                out.write("TEXT 4,4,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.nama, 16)}\"$eol".toByteArray(Charsets.US_ASCII))
-                out.write("TEXT 4,26,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
-                out.write("BARCODE $bcX,48,\"${barcodeKodeTsp(l.bc)}\",54,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
+            if (barcode2d) {
+                // QR code — padat, module tebal (terbaca di label kecil). TSPL: BARCODE x,y,"QRCODE",height,0,0,module,"data"
+                val topY = if (includeNama) 40 else 30
+                val (mQ, xQ) = qrGeo(l.bc, w, h, topY)
+                val bcSan = sanitizeTsp(l.bc)
+                if (includeNama) {
+                    out.write("TEXT 4,4,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.nama, 14)}\"$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("TEXT 4,20,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.harga, 20)}\"$eol".toByteArray(Charsets.US_ASCII))
+                } else {
+                    out.write("TEXT 4,4,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
+                }
+                out.write("BARCODE $xQ,$topY,\"QRCODE\",0,0,0,$mQ,\"$bcSan\"$eol".toByteArray(Charsets.US_ASCII))
             } else {
-                // label kecil: harga (seragam fontMul) + barcode (mengisi bawah)
-                out.write("TEXT 4,4,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.harga, 28)}\"$eol".toByteArray(Charsets.US_ASCII))
-                out.write("BARCODE $bcX,30,\"${barcodeKodeTsp(l.bc)}\",76,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
+                val (bcX, bcN) = barcodeGeo(l.bc, w)
+                if (includeNama) {
+                    // label normal: nama + harga seragam (font 1, multiplier fontMul)
+                    out.write("TEXT 4,4,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.nama, 16)}\"$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("TEXT 4,26,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("BARCODE $bcX,48,\"${barcodeKodeTsp(l.bc)}\",54,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
+                } else {
+                    // label kecil: harga (seragam fontMul) + barcode (mengisi bawah)
+                    out.write("TEXT 4,4,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.harga, 28)}\"$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("BARCODE $bcX,30,\"${barcodeKodeTsp(l.bc)}\",76,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
+                }
             }
             out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))
             out.write("FORFEED$eol".toByteArray(Charsets.US_ASCII))
@@ -237,6 +267,23 @@ object EscPosLabel {
         val x = ((wDots - bw) / 2).coerceAtLeast(1)
         return x to n
     }
+
+    /**
+     * QR: pilih ukuran module (dot) supaya QR kotak muat label & TEBAL (terbaca).
+     * Perkiraan QR value: ~29 modul utk data sampai ~40 alphanumeric (QR v3-4), batas aman.
+     * Menyesuaikan top area (tinggi tersedia). @return [module, x-tengah].
+     */
+    private fun qrGeo(bc: String, w: Int, h: Int, topY: Int): Pair<Int, Int> {
+        val modul = 29
+        val avail = (h - topY).coerceAtLeast(30)
+        val m = (minOf(w, avail) / modul).coerceIn(2, 10)
+        val size = modul * m
+        val x = ((w - size) / 2).coerceAtLeast(1)
+        return m to x
+    }
+
+    /** QR (preview/screen): sama dgn qrGeo print — module & x-tengah. */
+    private fun previewQrGeo(bc: String, w: Int, h: Int, topY: Int): Pair<Int, Int> = qrGeo(bc, w, h, topY)
 
     /** Buang karakter yg bisa merusak perintah TSPL. */
     private fun sanitizeTsp(s: String): String = s.filter { it in '0'..'9' || it in 'A'..'Z' || it in 'a'..'z' || it == ' ' }

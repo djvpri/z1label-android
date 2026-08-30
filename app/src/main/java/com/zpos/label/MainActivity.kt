@@ -66,6 +66,7 @@ class MainActivity : AppCompatActivity() {
     private var paperH = 15
     private var proto = "tspl"              // "tspl" (printer label clabel/... ) | "esc"
     private var fontMul = 1                  // 1|2|3 => S/M/L utk TEXT nama & harga label (seragam)
+    private var barcodeMode = "1d"           // "1d" (EAN-13/Code128) | "2d" (QR)
 
     private val permReq =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { _ ->
@@ -83,7 +84,9 @@ class MainActivity : AppCompatActivity() {
         sortMode = prefs.getString("sort", "baru") ?: "baru"
         proto = prefs.getString("proto", "tspl") ?: "tspl"
         fontMul = prefs.getInt("fontMul", 1)
+        barcodeMode = prefs.getString("barcodeMode", "1d") ?: "1d"
         b.btnFont.text = "Font: " + fontLabel(fontMul)
+        b.btnBarcode.text = barcodeBtnLabel()
         val paper = (prefs.getString("paper", "25x15") ?: "25x15").split("x")
         paperW = paper.getOrNull(0)?.toIntOrNull() ?: 25
         paperH = paper.getOrNull(1)?.toIntOrNull() ?: 15
@@ -121,6 +124,7 @@ class MainActivity : AppCompatActivity() {
         b.btnPaper.setOnClickListener { pilihKertas() }
         b.btnProto.setOnClickListener { toggleProto() }
         b.btnFont.setOnClickListener { toggleFont() }
+        b.btnBarcode.setOnClickListener { toggleBarcode() }
         b.btnCetak.setOnClickListener { cetak() }
         b.btnCekUpdate.setOnClickListener { cekUpdate(otomatis = false) }
         b.btnKirimLog.setOnClickListener { kirimLog() }
@@ -426,6 +430,16 @@ class MainActivity : AppCompatActivity() {
         Logger.log(this, "font", "ukuran ${fontLabel(fontMul)} (x${fontMul})")
     }
 
+    private fun barcodeBtnLabel() = if (barcodeMode == "2d") "Barcode: 2D" else "Barcode: 1D"
+
+    private fun toggleBarcode() {
+        barcodeMode = if (barcodeMode == "2d") "1d" else "2d"
+        prefs.edit().putString("barcodeMode", barcodeMode).apply()
+        b.btnBarcode.text = barcodeBtnLabel()
+        Logger.log(this, "barcode", "mode ${barcodeBtnLabel()}")
+        Toast.makeText(this, "Barcode: " + barcodeBtnLabel().removePrefix("Barcode: "), Toast.LENGTH_SHORT).show()
+    }
+
     private fun setPrinterLabel() {
         b.btnProto.text = btnProtoLabel()
         b.btnPrinter.text = "Printer: " + (printerAddress?.take(6)?.let { "…$it" } ?: "belum pilih")
@@ -483,7 +497,7 @@ class MainActivity : AppCompatActivity() {
             val labelPertama = pilih.first()
             val previewBmp = try {
                 val bcP = labelPertama.barcode?.takeIf { it.isNotBlank() } ?: Code128.generateV3(labelPertama.id)
-                EscPosLabel.previewBitmap(labelPertama.nama, labelPertama.harga, bcP, paperW, paperH)
+                EscPosLabel.previewBitmap(labelPertama.nama, labelPertama.harga, bcP, paperW, paperH, barcode2d = barcodeMode == "2d")
             } catch (e: Exception) { null }
             if (previewBmp != null) {
                 val lanjut = konfirmasiPrintPreview(previewBmp, pilih.size)
@@ -515,7 +529,7 @@ class MainActivity : AppCompatActivity() {
                             val bc = p.barcode?.takeIf { it.isNotBlank() } ?: Code128.generateV3(p.id)
                             EscPosLabel.LabelT(p.nama, p.harga, bc)
                         }
-                        EscPosLabel.buatRunTSPL(data, paperW, paperH, includeNama = paperH <= 20, fontMul = fontMul)
+                        EscPosLabel.buatRunTSPL(data, paperW, paperH, includeNama = paperH <= 20, fontMul = fontMul, barcode2d = barcodeMode == "2d")
                     } else {
                         val bmpList = pilih.mapIndexed { idx, p ->
                             try {
