@@ -31,6 +31,7 @@ import com.zpos.label.update.Updater
 import com.zpos.label.util.CrashReport
 import com.zpos.label.util.Logger
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -39,7 +40,11 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var b: ActivityMainBinding
     private lateinit var prefs: SharedPreferences
-    private val scope = CoroutineScope(Dispatchers.IO)
+    private val scope = CoroutineScope(Dispatchers.IO + CoroutineExceptionHandler { _, e ->
+        // exception coroutine yang tak di-catch dulu bocor -> app keluar sendiri tanpa jejak.
+        // Log lalu biarkan app TETAP JALAN (jangan crash mati).
+        if (::prefs.isInitialized) CrashReport.catat(applicationContext, e, "COROUTINE")
+    })
 
     private var semua: MutableList<Produk> = mutableListOf()
     private var tampil: MutableList<Produk> = mutableListOf()

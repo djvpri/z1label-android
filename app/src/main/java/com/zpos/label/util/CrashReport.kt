@@ -8,9 +8,14 @@ import java.util.Locale
 
 /**
  * Penangkap crash global (force-close / app keluar sendiri).
- * Pasang di onCreate sebelum apa pun -> tulis stacktrace ke file crash.log
- * sebelum app mati, biar bisa dikirim via tombol "Log" (WhatsApp).
- * Teruskan ke handler bawaan sesudahnya (app tetap mati normal).
+ * `install()` pasang di onCreate sebelum apa pun -> handler default-navigate
+ * tulis stacktrace ke file crash.log sebelum app mati + ke log sesi (Logger),
+ * biar bisa dikirim via tombol "Log" (WhatsApp). Teruskan ke handler bawaan
+ * sesudahnya (app tetap mati normal) utk crash murni.
+ *
+ * `catat(ctx, throwable)` dipakai oleh CoroutineExceptionHandler (scope) utk
+ * menangkap exception coroutine yang dulu membikin app keluar diam-diam — di-log
+ * tanpa membunuh app.
  */
 object CrashReport {
 
@@ -21,14 +26,21 @@ object CrashReport {
         installed = true
         val prev = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, e ->
-            val st = e.stackTraceToString()
-            val stamp = SimpleDateFormat("dd/MM HH:mm:ss", Locale.US).format(Date())
-            runCatching {
-                File(ctx.filesDir, "crash.log").writeText("=== $stamp ===\n$st\n")
-            }
+            runCatching { catat(ctx, e, "UNCAUGHT ${thread.name}") }
             // jangan lengah: tetap teruskan agar perilaku mati sistem normal
             prev?.uncaughtException(thread, e)
         }
+    }
+
+    /** Catat crash/error sah ke crash.log + log sesi (untuk kirim via tombol Log). */
+    fun catat(ctx: Context, e: Throwable, tag: String) {
+        val st = e.stackTraceToString()
+        val stamp = SimpleDateFormat("dd/MM HH:mm:ss", Locale.US).format(Date())
+        runCatching {
+            File(ctx.filesDir, "crash.log")
+                .appendText("[$tag] $stamp\n$st\n---\n")
+        }
+        runCatching { Logger.log(ctx, "crash", "[$tag] ${e::class.simpleName}: ${e.message}") }
     }
 
     /** Ambil teks crash terakhir (atau kosong). */
