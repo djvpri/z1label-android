@@ -157,6 +157,11 @@ class MainActivity : AppCompatActivity() {
             }
             val cur = BuildConfig.VERSION_NAME
             val adaBaru = Updater.lebihBaru(rilis.versi, cur)
+            // log hasil cek utk memudahkan diagnosa "notif update muncul padahal sudah terbaru"
+            if (adaBaru) {
+                Logger.log(this@MainActivity, "update",
+                    "NOTIF update: rilis='${rilis.versi}' app='$cur' apkUrl=${rilis.apkUrl ?: "TIDAK ADA"}")
+            }
             withContext(Dispatchers.Main) {
                 if (!adaBaru) {
                     if (!otomatis) b.lblStatus.text = "Sudah versi terbaru ($cur)"
@@ -431,8 +436,14 @@ class MainActivity : AppCompatActivity() {
                     throw e
                 }
                 val errWr = BluetoothPrinter.write(run)
-                Logger.log(this@MainActivity, "cetak",
-                    if (errWr != null) "kirim GAGAL: $errWr" else "kirim OK ${pilih.size} label, ${run.size} byte")
+                val versiApp = "v${BuildConfig.VERSION_NAME}(${BuildConfig.VERSION_CODE})"
+                if (errWr != null) {
+                    Logger.log(this@MainActivity, "cetak", "[$versiApp] kirim GAGAL: $errWr")
+                } else {
+                    val hex = run.take(8).joinToString("") { "%02X".format(it) }
+                    Logger.log(this@MainActivity, "cetak",
+                        "[$versiApp] kirim OK ${pilih.size} label, ${run.size} byte, head[0x$hex], connected=${BluetoothPrinter.connected()}")
+                }
                 withContext(Dispatchers.Main) {
                     b.lblStatus.text = if (errWr != null) "Cetak gagal: $errWr"
                         else "Cetak ${pilih.size} label ✓ (barcode baru otomatis utk yg kosong)"
