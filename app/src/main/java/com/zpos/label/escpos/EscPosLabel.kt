@@ -153,17 +153,21 @@ object EscPosLabel {
                 // label normal: nama + harga seragam (font 1, multiplier fontMul)
                 out.write("TEXT 4,4,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.nama, 16)}\"$eol".toByteArray(Charsets.US_ASCII))
                 out.write("TEXT 4,26,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
-                out.write("BARCODE 8,48,\"128\",54,0,0,2,2,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
+                out.write("BARCODE 8,48,\"${barcodeKodeTsp(l.bc)}\",54,0,0,2,2,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
             } else {
                 // label kecil: harga (seragam fontMul) + barcode (mengisi bawah)
                 out.write("TEXT 4,4,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.harga, 28)}\"$eol".toByteArray(Charsets.US_ASCII))
-                out.write("BARCODE 8,30,\"128\",76,0,0,2,2,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
+                out.write("BARCODE 8,30,\"${barcodeKodeTsp(l.bc)}\",76,0,0,2,2,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
             }
             out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))
             out.write("FORFEED$eol".toByteArray(Charsets.US_ASCII))
         }
         return out.toByteArray()
     }
+
+    /** Pilih tipe barcode TSPL: 13-digit (EAN-13, ~113 module sempit) atau Code128 utk lain. */
+    private fun barcodeKodeTsp(bc: String): String =
+        if (bc.length == 13 && bc.all { it.isDigit() }) "EAN13" else "128"
 
     /** Buang karakter yg bisa merusak perintah TSPL. */
     private fun sanitizeTsp(s: String): String = s.filter { it in '0'..'9' || it in 'A'..'Z' || it in 'a'..'z' || it == ' ' }
