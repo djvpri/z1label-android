@@ -217,46 +217,33 @@ object EscPosLabel {
         val yH = yN + fh + gap   // baris ke-2 (harga)
         val yB = yH + fh + gap   // barcode bawah (nama+harga)
         val barH = (h - yB - 6).coerceIn(16, 44)
-        // NOTE multi-label (v1.6.10): pakai SATU kanvas SETINGGI N label (SIZE setinggi step*n),
-        // zona tiap label di-offset idx*step, lalu PRINT 1,1 + FORFEED per batch.
-        //   - SIZE cukup tinggi => SEMUA zona masuk kanvas (konten item beda tercetak beda;
-        //     perbaiki v1.6.8 yg SIZE tetap 1-label -> zona ke-2+ keluar -> salinan item 1).
-        //   - PRINT 1,1 + FORFEED => printer maju setinggi kanvas utuh (tak bertimpa; perbaiki
-        //     v1.6.9 yg per-label PRINT 1,1+FORFEED kosong -> feed antar-job kurang -> timpa).
-        // GAP 16,0 = gap fisik antar label (kertas ber-gap). Zona label berikutnya = h + gap_gap.
-        val GAP_DOT = 16
-        val step = h + GAP_DOT                 // jarak antar label dalam kanvas (dot)
-        val MAX_SIZE_H = 2048                  // batas tinggi kanvas TSPL (aman utk clabel dll)
-        val chunkSize = (MAX_SIZE_H / step).coerceAtLeast(1)
-        for (start in ls.indices step chunkSize) {
-            val batch = ls.subList(start, minOf(start + chunkSize, ls.size))
-            val n = batch.size
-            val sizeH = step * n               // kanvas tinggi → semua zona masuk & feed pas
-            out.write("SIZE $w,$sizeH$eol".toByteArray(Charsets.US_ASCII))
+        // NOTE multi-label (v1.6.11): PER-LABEL job utuh — setiap label = SIZE h + GAP + CLS +
+        // isi (TEXT/BARCODE, y TANPA offset, semua dalam kanvas) + PRINT 1,1 + FORFEED <h>.
+        //   - per-label SIZE h = kanvas SATU label (aturan TSPL: SIZE = 1 kanvas; zona idx*step
+        //     dalam SIZE setinggi n h VIOLATES dgn zona y>h terpotong -> cuma item 1, v1.6.10).
+        //   - FORFEED <h> eksplisit = maju TEPAT SATU label (h dot) antar job -> tak bertimpa
+        //     (v1.6.9 pakai FORFEED tanpa angka = feed default kurang -> timpa kalau >1 label).
+        //   - konten per label dari `l` masing2 -> item beda tercetak beda.
+        for (l in ls) {
+            out.write("SIZE $w,$h$eol".toByteArray(Charsets.US_ASCII))
             out.write("GAP 16,0$eol".toByteArray(Charsets.US_ASCII))
             out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
-            batch.forEachIndexed { idx, l ->
-                val off = idx * step           // awal zona label idx
-                val yyN = yN + off
-                val yyH = yH + off
-                val yyB = yB + off
-                if (barcode2d) {
-                    val (mQ, xQ) = qrGeo(l.bc, w, h, yB)
-                    val qrH = (h - yB - 6).coerceIn(16, 44)
-                    val bcSan = sanitizeTsp(l.bc)
-                    out.write("TEXT 4,$yyN,\"1\",0,$fm,$fm,\"${clipTsp(l.nama, namaMaxChar(w, fm))}\"$eol".toByteArray(Charsets.US_ASCII))
-                    out.write("TEXT 4,$yyH,\"1\",0,$fm,$fm,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
-                    out.write("BARCODE $xQ,$yyB,\"QRCODE\",$qrH,0,0,$mQ,\"$bcSan\"$eol".toByteArray(Charsets.US_ASCII))
-                } else {
-                    val (bcX, bcN) = barcodeGeo(l.bc, w)
-                    // label: nama (1 baris) + harga + barcode — sisanya dihilangkan
-                    out.write("TEXT 4,$yyN,\"1\",0,$fm,$fm,\"${clipTsp(l.nama, namaMaxChar(w, fm))}\"$eol".toByteArray(Charsets.US_ASCII))
-                    out.write("TEXT 4,$yyH,\"1\",0,$fm,$fm,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
-                    out.write("BARCODE $bcX,$yyB,\"${barcodeKodeTsp(l.bc)}\",$barH,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
-                }
+            if (barcode2d) {
+                val (mQ, xQ) = qrGeo(l.bc, w, h, yB)
+                val qrH = (h - yB - 6).coerceIn(16, 44)
+                val bcSan = sanitizeTsp(l.bc)
+                out.write("TEXT 4,$yN,\"1\",0,$fm,$fm,\"${clipTsp(l.nama, namaMaxChar(w, fm))}\"$eol".toByteArray(Charsets.US_ASCII))
+                out.write("TEXT 4,$yH,\"1\",0,$fm,$fm,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
+                out.write("BARCODE $xQ,$yB,\"QRCODE\",$qrH,0,0,$mQ,\"$bcSan\"$eol".toByteArray(Charsets.US_ASCII))
+            } else {
+                val (bcX, bcN) = barcodeGeo(l.bc, w)
+                // label: nama (1 baris) + harga + barcode — sisanya dihilangkan
+                out.write("TEXT 4,$yN,\"1\",0,$fm,$fm,\"${clipTsp(l.nama, namaMaxChar(w, fm))}\"$eol".toByteArray(Charsets.US_ASCII))
+                out.write("TEXT 4,$yH,\"1\",0,$fm,$fm,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
+                out.write("BARCODE $bcX,$yB,\"${barcodeKodeTsp(l.bc)}\",$barH,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
             }
             out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))
-            out.write("FORFEED$eol".toByteArray(Charsets.US_ASCII))
+            out.write("FORFEED $h$eol".toByteArray(Charsets.US_ASCII))   // maju tepat 1 label
         }
         return out.toByteArray()
     }
