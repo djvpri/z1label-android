@@ -56,7 +56,7 @@ object Logger {
             val filtered = StringBuilder()
             var idx = 0
             for (ln in s.lineSequence()) {
-                if (ln.isNotBlank() && idx < keep.size && keep[idx]) filtered.append(ln).append('\n')
+                if (ln.isNotBlank() && idx < keep.size && keep[idx] == true) filtered.append(ln).append('\n')
                 idx++
             }
             val v = try { BuildConfig.VERSION_NAME } catch (e: Exception) { "?" }
