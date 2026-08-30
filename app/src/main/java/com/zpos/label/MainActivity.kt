@@ -492,16 +492,14 @@ class MainActivity : AppCompatActivity() {
                     if (proto == "tspl") {
                         // printer label (clabel, dll) : TSPL — printer render text+barcode sendiri
                         val data = pilih.map { p ->
-                            val bc = if (p.barcode != null && p.barcode.length == 6 && p.barcode.all { it.isDigit() })
-                                p.barcode else Code128.generateV3(p.id)
+                            val bc = p.barcode?.takeIf { it.isNotBlank() } ?: Code128.generateV3(p.id)
                             EscPosLabel.LabelT(p.nama, p.harga, bc)
                         }
                         EscPosLabel.buatRunTSPL(data, paperW, paperH, includeNama = paperH <= 20, fontMul = fontMul)
                     } else {
                         val bmpList = pilih.mapIndexed { idx, p ->
                             try {
-                                val bc = if (p.barcode != null && p.barcode.length == 6 && p.barcode.all { it.isDigit() })
-                                    p.barcode else Code128.generateV3(p.id)
+                                val bc = p.barcode?.takeIf { it.isNotBlank() } ?: Code128.generateV3(p.id)
                                 EscPosLabel.buatLabel(p.nama, p.harga, bc, paperW, paperH)
                             } catch (e: Exception) {
                                 Logger.log(this@MainActivity, "cetak",
