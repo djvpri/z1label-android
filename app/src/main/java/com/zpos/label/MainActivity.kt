@@ -580,7 +580,7 @@ class MainActivity : AppCompatActivity() {
                             val bc = barcodeLabel(p, bcSrc == "13")
                             EscPosLabel.LabelT(p.nama, p.harga, bc)
                         }
-                        EscPosLabel.buatRunTSPL(data, paperW, paperH, includeNama = paperH <= 20, fontMul = fontMul, barcode2d = barcodeMode == "2d")
+                        EscPosLabel.buatRunTSPL(data, paperW, paperH, includeNama = true, fontMul = fontMul, barcode2d = barcodeMode == "2d")
                     } else {
                         val bmpList = pilih.mapIndexed { idx, p ->
                             try {
