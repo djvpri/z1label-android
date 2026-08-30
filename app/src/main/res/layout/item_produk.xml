@@ -30,7 +30,7 @@
             android:text="Nama"
             android:textSize="15sp"
             android:textStyle="bold"
-            android:textColor="#111111"
+            android:textColor="#FFFFFF"
             android:maxLines="2"
             android:ellipsize="end" />
     </LinearLayout>

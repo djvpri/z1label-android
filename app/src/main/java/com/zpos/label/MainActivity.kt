@@ -241,6 +241,8 @@ class MainActivity : AppCompatActivity() {
                 res.onSuccess { list ->
                     semua = list.toMutableList()
                     selected.clear()
+                    val kosong = list.count { it.nama.isBlank() }
+                    Logger.log(this@MainActivity, "load", "produk=${list.size}, nama-kosong=$kosong")
                     filterList(b.txtCari.text.toString())
                     b.btnCetak.isEnabled = false
                     b.lblStatus.text = "${semua.size} produk"
