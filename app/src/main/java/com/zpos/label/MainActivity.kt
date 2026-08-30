@@ -540,6 +540,7 @@ class MainActivity : AppCompatActivity() {
         if (!bluetoothOk(true)) { b.btnCetak.isEnabled = true; return }
         scope.launch {
             val pilih = tampil.filter { it.id in selected }
+            var cetakQty = 1   // jumlah lembar tiap produk (default 1; diisi bila preview tampil)
             if (pilih.isEmpty()) { withContext(Dispatchers.Main){ b.btnCetak.isEnabled=true; b.lblStatus.text="Pilih produk dulu" }; return@launch }
 
             Logger.log(this@MainActivity, "cetak", "mulai ${pilih.size} label, kertas ${paperW}x${paperH}mm, print ${printerAddress ?: "-"}")
@@ -551,13 +552,14 @@ class MainActivity : AppCompatActivity() {
                 EscPosLabel.previewBitmap(labelPertama.nama, labelPertama.harga, bcP, paperW, paperH, barcode2d = barcodeMode == "2d")
             } catch (e: Exception) { null }
             if (previewBmp != null) {
-                val lanjut = konfirmasiPrintPreview(previewBmp, pilih.size)
-                if (!lanjut) {
+                val qty = konfirmasiPrintPreview(previewBmp, pilih.size)
+                if (qty == null) {
                     withContext(Dispatchers.Main) {
                         b.lblStatus.text = "Cetak dibatalkan (pratinjau)"; b.btnCetak.isEnabled = true
                     }
                     return@launch
                 }
+                cetakQty = qty
             }
 
             // konek bila belum (auto-connect mungkin sudah buat); socket dijaga hidup antar cetak
@@ -576,19 +578,22 @@ class MainActivity : AppCompatActivity() {
                 val run = try {
                     if (proto == "tspl") {
                         // printer label (clabel, dll) : TSPL — printer render text+barcode sendiri
-                        val data = pilih.map { p ->
+                        // Qty: tiap produk dicetak cetakQty kali berurutan (AAABBB bila 3 produk x3)
+                        val data = pilih.flatMap { p ->
                             val bc = barcodeLabel(p, bcSrc == "13")
-                            EscPosLabel.LabelT(p.nama, p.harga, bc)
+                            val lt = EscPosLabel.LabelT(p.nama, p.harga, bc)
+                            List(cetakQty) { lt }
                         }
                         EscPosLabel.buatRunTSPL(data, paperW, paperH, includeNama = true, fontMul = fontMul, barcode2d = barcodeMode == "2d")
                     } else {
-                        val bmpList = pilih.mapIndexed { idx, p ->
+                        val bmpList = pilih.flatMap { p ->
                             try {
                                 val bc = barcodeLabel(p, bcSrc == "13")
-                                EscPosLabel.buatLabel(p.nama, p.harga, bc, paperW, paperH)
+                                val bmp = EscPosLabel.buatLabel(p.nama, p.harga, bc, paperW, paperH)
+                                List(cetakQty) { bmp }
                             } catch (e: Exception) {
                                 Logger.log(this@MainActivity, "cetak",
-                                    "gagal bulat-label #$idx (${p.nama} id ${p.id} bc ${p.barcode}): ${e::class.simpleName}: ${e.message}")
+                                    "gagal bulat-label (${p.nama} id ${p.id} bc ${p.barcode}): ${e::class.simpleName}: ${e.message}")
                                 throw e
                             }
                         }
@@ -598,6 +603,7 @@ class MainActivity : AppCompatActivity() {
                     Logger.log(this@MainActivity, "cetak", "gagal buatRun($proto): ${e::class.simpleName}: ${e.message}")
                     throw e
                 }
+                val totalLabel = pilih.size * cetakQty
                 val errWr = BluetoothPrinter.write(run)
                 val versiApp = "v${BuildConfig.VERSION_NAME}(${BuildConfig.VERSION_CODE})"
                 if (errWr != null) {
@@ -605,11 +611,11 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     val hex = run.take(8).joinToString("") { "%02X".format(it) }
                     Logger.log(this@MainActivity, "cetak",
-                        "[$versiApp] kirim OK ${pilih.size} label, ${run.size} byte, proto=$proto, head[0x$hex], connected=${BluetoothPrinter.connected()}")
+                        "[$versiApp] kirim OK $totalLabel label (${pilih.size} produk x$cetakQty), ${run.size} byte, proto=$proto, head[0x$hex], connected=${BluetoothPrinter.connected()}")
                 }
                 withContext(Dispatchers.Main) {
                     b.lblStatus.text = if (errWr != null) "Cetak gagal: $errWr"
-                        else "Cetak ${pilih.size} label ✓ (barcode baru otomatis utk yg kosong)"
+                        else "Cetak $totalLabel label ✓ ($cetakQty lembar tiap ${pilih.size} produk)"
                     b.btnCetak.isEnabled = true
                 }
             } catch (e: Exception) {
@@ -625,25 +631,44 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Tampilkan pratinjau (bitmap) + tombol Cetak/Batal sebelum kirim ke printer.
-     * suspend: menanti pilihan user; true = lanjut cetak, false = batal.
+     * Tampilkan pratinjau (bitmap) + input jumlah tiap produk + tombol Cetak/Batal sebelum kirim.
+     * suspend: menanti pilihan user. Return = qty tiap produk (>=1), null = batal.
      */
-    private suspend fun konfirmasiPrintPreview(bitmap: Bitmap, jumlah: Int): Boolean =
+    private suspend fun konfirmasiPrintPreview(bitmap: Bitmap, jumlah: Int): Int? =
         withContext(Dispatchers.Main) {
             suspendCancellableCoroutine { cont ->
+                val d = resources.displayMetrics.density
                 val img = ImageView(this@MainActivity).apply {
                     setImageBitmap(bitmap)
                     adjustViewBounds = true
-                    maxWidth = (resources.displayMetrics.density * 260).toInt()
-                    maxHeight = (resources.displayMetrics.density * 200).toInt()
-                    setPadding(24, 16, 24, 0)
+                    maxWidth = (d * 260).toInt()
+                    maxHeight = (d * 160).toInt()
+                    setPadding(24, 12, 24, 0)
+                }
+                val et = android.widget.EditText(this@MainActivity).apply {
+                    inputType = android.text.InputType.TYPE_CLASS_NUMBER
+                    setText("1")
+                    setPadding(24, 8, 24, 8)
+                }
+                val col = android.widget.LinearLayout(this@MainActivity).apply {
+                    orientation = android.widget.LinearLayout.VERTICAL
+                    addView(img)
+                    val lbl = android.widget.TextView(this@MainActivity).apply {
+                        text = "Jumlah tiap produk (1–99):"
+                        setPadding(24, 12, 24, 0)
+                    }
+                    addView(lbl)
+                    addView(et)
                 }
                 val dlg = AlertDialog.Builder(this@MainActivity)
-                    .setTitle("Pratinjau — Cetak $jumlah label?")
-                    .setView(img)
-                    .setPositiveButton("Cetak") { _, _ -> if (cont.isActive) cont.resume(true) }
-                    .setNegativeButton("Batal") { _, _ -> if (cont.isActive) cont.resume(false) }
-                    .setOnCancelListener { if (cont.isActive) cont.resume(false) }
+                    .setTitle("Pratinjau — $jumlah produk")
+                    .setView(col)
+                    .setPositiveButton("Cetak") { _, _ ->
+                        val q = (et.text?.toString()?.toIntOrNull() ?: 1).coerceIn(1, 99)
+                        if (cont.isActive) cont.resume(q)
+                    }
+                    .setNegativeButton("Batal") { _, _ -> if (cont.isActive) cont.resume(null) }
+                    .setOnCancelListener { if (cont.isActive) cont.resume(null) }
                     .create()
                 dlg.show()
             }
