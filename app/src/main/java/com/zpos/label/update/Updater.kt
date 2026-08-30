@@ -132,8 +132,8 @@ object Updater {
         } catch (e: Exception) {
             lastErr = "download: ${e::class.simpleName}: ${e.message}"
             null
-        } ?: return false
-        val act = ctx as? Activity ?: return false
+        } ?: run { onLog?.invoke("installer: ABAIKAN — file null ($lastErr)"); return false }
+        val act = ctx as? Activity ?: run { onLog?.invoke("installer: ABAIKAN — context bukan Activity"); return false }
         // buka system installer di MAIN thread; return = apakah installer berhasil dibuka.
         // (Jangan `return true` blind: ACTION_VIEW bisa gagal -> dulu log 'berhasil' palsu.)
         val terbuka = try {
@@ -149,10 +149,17 @@ object Updater {
                     onLog?.invoke("installer: dibuka")
                     true
                 } catch (e: Exception) {
-                    lastErr = "buka installer: ${e::class.simpleName}: ${e.message}"
-                    onLog?.invoke("installer GAGAL buka: $lastErr")
-                    Toast.makeText(act, "Gagal buka installer: ${e.message}", Toast.LENGTH_LONG).show()
-                    false
+                    // beberapa ROM (label/vendor) tolak ACTION_VIEW langsung — coba chooser
+                    try {
+                        act.startActivity(Intent.createChooser(i, "Buka installer"))
+                        onLog?.invoke("installer: dibuka via chooser")
+                        true
+                    } catch (e2: Exception) {
+                        lastErr = "buka installer: ${e::class.simpleName}: ${e.message} (chooser: ${e2.message})"
+                        onLog?.invoke("installer GAGAL buka: $lastErr")
+                        Toast.makeText(act, "Gagal buka installer: ${e.message}", Toast.LENGTH_LONG).show()
+                        false
+                    }
                 }
             }
         } catch (e: Exception) {
