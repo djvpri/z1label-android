@@ -216,7 +216,9 @@ object EscPosLabel {
         val yN = 4
         val yH = yN + fh + gap   // baris ke-2 (harga)
         val yB = yH + fh + gap   // barcode bawah (nama+harga)
-        val barH = (h - yB - 6).coerceIn(16, 44)
+        // barH ADAPTIF utk semua ukuran label, TAPI tetap 44 persis utk 25x15 (h=120):
+        // rasio 44/120 -> label tinggi barcode membesar mengisi sisa, label kecil tetap sama.
+        val barH = (h * 44 / 120).coerceIn(16, (h - yB - 6).coerceAtLeast(16))
         // NOTE multi-label (v1.6.11): PER-LABEL job utuh — setiap label = SIZE h + GAP + CLS +
         // isi (TEXT/BARCODE, y TANPA offset, semua dalam kanvas) + PRINT 1,1 + FORFEED <h>.
         //   - per-label SIZE h = kanvas SATU label (aturan TSPL: SIZE = 1 kanvas; zona idx*step
@@ -230,7 +232,7 @@ object EscPosLabel {
             out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
             if (barcode2d) {
                 val (mQ, xQ) = qrGeo(l.bc, w, h, yB)
-                val qrH = (h - yB - 6).coerceIn(16, 44)
+                val qrH = (h * 44 / 120).coerceIn(16, (h - yB - 6).coerceAtLeast(16))
                 val bcSan = sanitizeTsp(l.bc)
                 out.write("TEXT 4,$yN,\"1\",0,$fm,$fm,\"${clipTsp(l.nama, namaMaxChar(w, fm))}\"$eol".toByteArray(Charsets.US_ASCII))
                 out.write("TEXT 4,$yH,\"1\",0,$fm,$fm,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
@@ -303,7 +305,10 @@ object EscPosLabel {
     }
 
     /** Max chars NAMA di label agar muat 1 baris (TSPL font "1" ≈ 4 dot/char × fontMul),
-     *  dipotong biar tak overflow lebar label; barcode tetap utamakan (diletak di baris lain). */
-    private fun namaMaxChar(w: Int, fontMul: Int): Int =
-        minOf(16, ((w - 8) / (4.0 * fontMul)).toInt()).coerceAtLeast(4)
+     *  dipotong biar tak overflow lebar label; barcode tetap utamakan (diletak di baris lain).
+     *  Cap 16 utk label 25mm (identik perilaku lama); label lebih lebar boleh lebih panjang (<=48). */
+    private fun namaMaxChar(w: Int, fontMul: Int): Int {
+        val cap = if (w <= 200) 16 else 48
+        return minOf(cap, ((w - 8) / (4.0 * fontMul)).toInt()).coerceAtLeast(4)
+    }
 }
