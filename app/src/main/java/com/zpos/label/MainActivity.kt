@@ -428,30 +428,57 @@ class MainActivity : AppCompatActivity() {
     private fun fontLabel(m: Int) = when (m) { 1 -> "S"; 2 -> "M"; else -> "L" }
 
     private fun toggleFont() {
-        fontMul = if (fontMul >= 3) 1 else fontMul + 1
-        prefs.edit().putInt("fontMul", fontMul).apply()
-        b.btnFont.text = "Font: " + fontLabel(fontMul)
-        Logger.log(this, "font", "ukuran ${fontLabel(fontMul)} (x${fontMul})")
+        val opt = arrayOf("S (kecil)", "M (sedang)", "L (besar)")
+        val cur = (fontMul - 1).coerceIn(0, 2)
+        AlertDialog.Builder(this)
+            .setTitle("Ukuran Huruf Nama & Harga")
+            .setSingleChoiceItems(opt, cur) { d, i ->
+                fontMul = i + 1
+                prefs.edit().putInt("fontMul", fontMul).apply()
+                b.btnFont.text = "Font: " + fontLabel(fontMul)
+                Logger.log(this, "font", "ukuran ${fontLabel(fontMul)} (x${fontMul})")
+                d.dismiss()
+            }
+            .setNegativeButton("Batal", null)
+            .show()
     }
 
     private fun barcodeBtnLabel() = if (barcodeMode == "2d") "2D" else "1D"
 
     private fun toggleBarcode() {
-        barcodeMode = if (barcodeMode == "2d") "1d" else "2d"
-        prefs.edit().putString("barcodeMode", barcodeMode).apply()
-        b.btnBarcode.text = barcodeBtnLabel()
-        Logger.log(this, "barcode", "mode ${barcodeBtnLabel()}")
-        Toast.makeText(this, "Barcode: " + barcodeBtnLabel().removePrefix("Barcode: "), Toast.LENGTH_SHORT).show()
+        val opt = arrayOf("1D (barcode garis)", "2D (QR code)")
+        val cur = if (barcodeMode == "2d") 1 else 0
+        AlertDialog.Builder(this)
+            .setTitle("Jenis Barcode")
+            .setSingleChoiceItems(opt, cur) { d, i ->
+                barcodeMode = if (i == 0) "1d" else "2d"
+                prefs.edit().putString("barcodeMode", barcodeMode).apply()
+                b.btnBarcode.text = barcodeBtnLabel()
+                Logger.log(this, "barcode", "mode ${barcodeBtnLabel()}")
+                Toast.makeText(this, "Barcode: ${barcodeBtnLabel()}", Toast.LENGTH_SHORT).show()
+                d.dismiss()
+            }
+            .setNegativeButton("Batal", null)
+            .show()
     }
 
     private fun bcSrcBtnLabel() = if (bcSrc == "13") "13 digit" else "6 digit"
 
     private fun toggleBcSrc() {
-        bcSrc = if (bcSrc == "13") "6" else "13"
-        prefs.edit().putString("bcSrc", bcSrc).apply()
-        b.btnBcSrc.text = bcSrcBtnLabel()
-        Logger.log(this, "barcode", "sumber ${bcSrcBtnLabel()}")
-        Toast.makeText(this, "Cetak barcode: ${bcSrcBtnLabel()}", Toast.LENGTH_SHORT).show()
+        val opt = arrayOf("6 digit (barcode_internal)", "13 digit (barcode asli)")
+        val cur = if (bcSrc == "13") 1 else 0
+        AlertDialog.Builder(this)
+            .setTitle("Cetak barcode mana?")
+            .setSingleChoiceItems(opt, cur) { d, i ->
+                bcSrc = if (i == 0) "6" else "13"
+                prefs.edit().putString("bcSrc", bcSrc).apply()
+                b.btnBcSrc.text = bcSrcBtnLabel()
+                Logger.log(this, "barcode", "sumber ${bcSrcBtnLabel()}")
+                Toast.makeText(this, "Cetak barcode: ${bcSrcBtnLabel()}", Toast.LENGTH_SHORT).show()
+                d.dismiss()
+            }
+            .setNegativeButton("Batal", null)
+            .show()
     }
 
     private fun setPrinterLabel() {
@@ -469,11 +496,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun toggleProto() {
-        proto = if (proto == "tspl") "esc" else "tspl"
-        prefs.edit().putString("proto", proto).apply()
-        b.btnProto.text = btnProtoLabel()
-        Logger.log(this, "proto", "ganti ke $proto")
-        Toast.makeText(this, "Protokol: ${btnProtoLabel().substringBefore(" · ")}", Toast.LENGTH_SHORT).show()
+        val opt = arrayOf("TSPL (printer label)", "ESC/POS (raster)")
+        val cur = if (proto == "tspl") 0 else 1
+        AlertDialog.Builder(this)
+            .setTitle("Protokol Printer")
+            .setSingleChoiceItems(opt, cur) { d, i ->
+                proto = if (i == 0) "tspl" else "esc"
+                prefs.edit().putString("proto", proto).apply()
+                b.btnProto.text = btnProtoLabel()
+                setPrinterLabel()
+                Logger.log(this, "proto", "ganti ke $proto")
+                b.lblStatus.text = "Protokol: ${btnProtoLabel()} — cetak utk sambung ulang"
+                d.dismiss()
+            }
+            .setNegativeButton("Batal", null)
+            .show()
     }
 
     private fun bluetoothOk(ask: Boolean): Boolean {
