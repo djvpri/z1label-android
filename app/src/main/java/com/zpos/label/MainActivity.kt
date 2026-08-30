@@ -423,7 +423,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun btnProtoLabel() =
-        if (proto == "tspl") "TSPL Printer Label · aktif" else "ESC/POS Raster · aktif"
+        if (proto == "tspl") "TSPL" else "ESC"
 
     private fun fontLabel(m: Int) = when (m) { 1 -> "S"; 2 -> "M"; else -> "L" }
 
@@ -434,7 +434,7 @@ class MainActivity : AppCompatActivity() {
         Logger.log(this, "font", "ukuran ${fontLabel(fontMul)} (x${fontMul})")
     }
 
-    private fun barcodeBtnLabel() = if (barcodeMode == "2d") "Barcode: 2D" else "Barcode: 1D"
+    private fun barcodeBtnLabel() = if (barcodeMode == "2d") "2D" else "1D"
 
     private fun toggleBarcode() {
         barcodeMode = if (barcodeMode == "2d") "1d" else "2d"

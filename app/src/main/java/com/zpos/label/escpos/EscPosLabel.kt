@@ -217,7 +217,7 @@ object EscPosLabel {
                 val qrH = (h - topY).coerceAtLeast(30)   // tinggi QR (dot) utk param ke-4
                 val bcSan = sanitizeTsp(l.bc)
                 if (includeNama) {
-                    out.write("TEXT 4,4,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.nama, 14)}\"$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("TEXT 4,4,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.nama, namaMaxChar(w, fontMul))}\"$eol".toByteArray(Charsets.US_ASCII))
                     out.write("TEXT 4,20,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.harga, 20)}\"$eol".toByteArray(Charsets.US_ASCII))
                 } else {
                     out.write("TEXT 4,4,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
@@ -227,7 +227,7 @@ object EscPosLabel {
                 val (bcX, bcN) = barcodeGeo(l.bc, w)
                 if (includeNama) {
                     // label normal: nama + harga seragam (font 1, multiplier fontMul)
-                    out.write("TEXT 4,4,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.nama, 16)}\"$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("TEXT 4,4,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.nama, namaMaxChar(w, fontMul))}\"$eol".toByteArray(Charsets.US_ASCII))
                     out.write("TEXT 4,26,\"1\",0,$fontMul,$fontMul,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
                     out.write("BARCODE $bcX,48,\"${barcodeKodeTsp(l.bc)}\",54,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
                 } else {
@@ -295,4 +295,9 @@ object EscPosLabel {
         val clean = sanitizeTsp(s)
         return if (clean.length > maxChars) clean.take(maxChars - 1) + "." else clean
     }
+
+    /** Max chars NAMA di label agar muat 1 baris (TSPL font "1" ≈ 4 dot/char × fontMul),
+     *  dipotong biar tak overflow lebar label; barcode tetap utamakan (diletak di baris lain). */
+    private fun namaMaxChar(w: Int, fontMul: Int): Int =
+        minOf(16, ((w - 8) / (4.0 * fontMul)).toInt()).coerceAtLeast(4)
 }

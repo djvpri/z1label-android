@@ -31,7 +31,8 @@
             android:textSize="15sp"
             android:textStyle="bold"
             android:textColor="#FFFFFF"
-            android:maxLines="2"
-            android:ellipsize="end" />
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:singleLine="true" />
     </LinearLayout>
 </LinearLayout>

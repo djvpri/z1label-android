@@ -47,7 +47,8 @@
             android:textColor="#888" />
 
         <Button
-            android:id="@+id/btnLogin"
+                style="@style/BtnRun"
+                android:id="@+id/btnLogin"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
@@ -87,6 +88,7 @@
                 android:inputType="text" />
 
             <Button
+                style="@style/BtnRun"
                 android:id="@+id/btnSort"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -95,6 +97,7 @@
                 android:text="Urut" />
 
             <Button
+                style="@style/BtnRun"
                 android:id="@+id/btnPaper"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -117,12 +120,14 @@
             android:padding="8dp">
 
             <Button
+                style="@style/BtnRun"
                 android:id="@+id/btnPrinter"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Pilih Printer Bluetooth..." />
 
             <Button
+                style="@style/BtnRun"
                 android:id="@+id/btnCetak"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -137,14 +142,16 @@
                 android:orientation="horizontal">
 
                 <Button
-                    android:id="@+id/btnProto"
+                style="@style/BtnRun"
+                android:id="@+id/btnProto"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="TSPL Printer Label" />
 
                 <Button
-                    android:id="@+id/btnFont"
+                style="@style/BtnRun"
+                android:id="@+id/btnFont"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
@@ -152,7 +159,8 @@
                     android:text="Font: S" />
 
                 <Button
-                    android:id="@+id/btnBarcode"
+                style="@style/BtnRun"
+                android:id="@+id/btnBarcode"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
@@ -162,7 +170,8 @@
                     android:minWidth="52dp" />
 
                 <Button
-                    android:id="@+id/btnBcSrc"
+                style="@style/BtnRun"
+                android:id="@+id/btnBcSrc"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
@@ -179,14 +188,16 @@
                 android:orientation="horizontal">
 
                 <Button
-                    android:id="@+id/btnRefresh"
+                style="@style/BtnRun"
+                android:id="@+id/btnRefresh"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="Muat Ulang" />
 
                 <Button
-                    android:id="@+id/btnLogout"
+                style="@style/BtnRun"
+                android:id="@+id/btnLogout"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
@@ -194,7 +205,8 @@
                     android:text="Keluar" />
 
                 <Button
-                    android:id="@+id/btnCekUpdate"
+                style="@style/BtnRun"
+                android:id="@+id/btnCekUpdate"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
@@ -202,7 +214,8 @@
                     android:text="Update" />
 
                 <Button
-                    android:id="@+id/btnKirimLog"
+                style="@style/BtnRun"
+                android:id="@+id/btnKirimLog"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
