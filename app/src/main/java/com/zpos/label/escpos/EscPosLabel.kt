@@ -111,7 +111,16 @@ object EscPosLabel {
                 c.drawRect(xa.toFloat(), topBar.toFloat(), (xa + b.wModul * ndot).toFloat(), (topBar + hpx).toFloat(), bcPaint)
             }
         } else {
-            drawBarcode(c, Code128.encodeCDigits(barcode) ?: Code128.encodeBText(barcode), h - topBar, h, sc, w)
+            val bc = Code128.encodeCDigits(barcode) ?: Code128.encodeBText(barcode)
+            // Label 40x30 (h>=240): barcode penuh mengisi sisa + nomor barcode di bawah (mirror TSPL).
+            val bigL = h >= 240
+            val hpx = if (bigL) h - topBar - 18 else h - topBar
+            drawBarcode(c, bc, hpx, h, sc, w)
+            if (bigL) {
+                val txt = clipText(barcode, paint, w - (sc * 2))
+                paint.textSize = sc * 0.9f
+                c.drawText(txt, w / 2f, topBar + hpx + (sc * 1.4f), paint)
+            }
         }
         return bmp
     }
@@ -216,9 +225,15 @@ object EscPosLabel {
         val yN = 4
         val yH = yN + fh + gap   // baris ke-2 (harga)
         val yB = yH + fh + gap   // barcode bawah (nama+harga)
-        // barH ADAPTIF utk semua ukuran label, TAPI tetap 44 persis utk 25x15 (h=120):
-        // rasio 44/120 -> label tinggi barcode membesar mengisi sisa, label kecil tetap sama.
-        val barH = (h * 44 / 120).coerceIn(16, (h - yB - 6).coerceAtLeast(16))
+        // Label 40x30 (h>=240): barcode MEMBESAR penuh mengisi sisa label (bidang yB..h)
+        // + NOMOR BARCODE dicetak di bawah garis. Ukuran lain (25x15=120, 30x20/40x20=160,
+        // 50x25=200) MENJAGA perilaku lama (barH proporsional 44/120) — tak berubah.
+        val bigLabel = h >= 240
+        val barH = if (bigLabel)
+            (h - yB - 18).coerceAtLeast(16)          // sisa penuh, sisakan 18 dot utk no-barcode text
+        else
+            (h * 44 / 120).coerceIn(16, (h - yB - 6).coerceAtLeast(16))
+        val yBcText = if (bigLabel) yB + barH + 2 else -1
         // NOTE multi-label (v1.6.11): PER-LABEL job utuh — setiap label = SIZE h + GAP + CLS +
         // isi (TEXT/BARCODE, y TANPA offset, semua dalam kanvas) + PRINT 1,1 + FORFEED <h>.
         //   - per-label SIZE h = kanvas SATU label (aturan TSPL: SIZE = 1 kanvas; zona idx*step
@@ -243,6 +258,13 @@ object EscPosLabel {
                 out.write("TEXT 4,$yN,\"1\",0,$fm,$fm,\"${clipTsp(l.nama, namaMaxChar(w, fm))}\"$eol".toByteArray(Charsets.US_ASCII))
                 out.write("TEXT 4,$yH,\"1\",0,$fm,$fm,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
                 out.write("BARCODE $bcX,$yB,\"${barcodeKodeTsp(l.bc)}\",$barH,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
+                if (bigLabel) {
+                    // Nomor barcode di bawah garis (label besar 40x30) biar terbaca & label penuh.
+                    // Font "1" mul 1: teks center, font ≈4 dot/char.
+                    val txt = clipTsp(l.bc, (w / 4).coerceAtLeast(8))
+                    val xTxt = ((w - txt.length * 4) / 2).coerceAtLeast(0)
+                    out.write("TEXT $xTxt,$yBcText,\"1\",0,1,1,\"$txt\"$eol".toByteArray(Charsets.US_ASCII))
+                }
             }
             out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))
             out.write("FORFEED $h$eol".toByteArray(Charsets.US_ASCII))   // maju tepat 1 label
