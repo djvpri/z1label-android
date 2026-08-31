@@ -306,9 +306,9 @@ class MainActivity : AppCompatActivity() {
     /** Dialog ukuran kertas label; disimpan utk cetak. */
     private fun pilihKertas() {
         val sizes = arrayOf(
-            "Label 25x15 mm", "Label 30x20 mm", "Label 40x20 mm", "Label 50x25 mm"
+            "Label 25x15 mm", "Label 30x20 mm", "Label 40x30 mm", "Label 40x20 mm", "Label 50x25 mm"
         )
-        val vals = arrayOf("25x15", "30x20", "40x20", "50x25")
+        val vals = arrayOf("25x15", "30x20", "40x30", "40x20", "50x25")
         val cur = vals.indexOf("${paperW}x${paperH}").coerceAtLeast(0)
         AlertDialog.Builder(this)
             .setTitle("Ukuran Kertas Label")
