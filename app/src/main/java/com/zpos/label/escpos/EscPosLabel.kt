@@ -114,7 +114,7 @@ object EscPosLabel {
             val bc = Code128.encodeCDigits(barcode) ?: Code128.encodeBText(barcode)
             // Label 40x30 (h>=240): barcode penuh mengisi sisa + nomor barcode di bawah (mirror TSPL).
             val bigL = h >= 240
-            val hpx = if (bigL) h - topBar - 18 else h - topBar
+            val hpx = if (bigL) ((h - topBar - 18) * 9 / 10) else h - topBar
             drawBarcode(c, bc, hpx, h, sc, w)
             if (bigL) {
                 val txt = clipText(barcode, paint, w - (sc * 2))
@@ -230,7 +230,7 @@ object EscPosLabel {
         // 50x25=200) MENJAGA perilaku lama (barH proporsional 44/120) — tak berubah.
         val bigLabel = h >= 240
         val barH = if (bigLabel)
-            (h - yB - 18).coerceAtLeast(16)          // sisa penuh, sisakan 18 dot utk no-barcode text
+            ((h - yB - 18) * 9 / 10).coerceAtLeast(16)   // ~90% isi — tak terlalu penuh, sisakan ruang bawah
         else
             (h * 44 / 120).coerceIn(16, (h - yB - 6).coerceAtLeast(16))
         val yBcText = if (bigLabel) yB + barH + 2 else -1
@@ -249,14 +249,18 @@ object EscPosLabel {
                 val (mQ, xQ) = qrGeo(l.bc, w, h, yB)
                 val qrH = (h * 44 / 120).coerceIn(16, (h - yB - 6).coerceAtLeast(16))
                 val bcSan = sanitizeTsp(l.bc)
-                out.write("TEXT 4,$yN,\"1\",0,$fm,$fm,\"${clipTsp(l.nama, namaMaxChar(w, fm))}\"$eol".toByteArray(Charsets.US_ASCII))
-                out.write("TEXT 4,$yH,\"1\",0,$fm,$fm,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
+                val xN2 = if (bigLabel) centerXTsP(clipTsp(l.nama, namaMaxChar(w, fm)).length, fm, w) else 4
+                val xH2 = if (bigLabel) centerXTsP(clipTsp(l.harga, 24).length, fm, w) else 4
+                out.write("TEXT $xN2,$yN,\"1\",0,$fm,$fm,\"${clipTsp(l.nama, namaMaxChar(w, fm))}\"$eol".toByteArray(Charsets.US_ASCII))
+                out.write("TEXT $xH2,$yH,\"1\",0,$fm,$fm,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
                 out.write("BARCODE $xQ,$yB,\"QRCODE\",$qrH,0,0,$mQ,\"$bcSan\"$eol".toByteArray(Charsets.US_ASCII))
             } else {
                 val (bcX, bcN) = barcodeGeo(l.bc, w)
                 // label: nama (1 baris) + harga + barcode — sisanya dihilangkan
-                out.write("TEXT 4,$yN,\"1\",0,$fm,$fm,\"${clipTsp(l.nama, namaMaxChar(w, fm))}\"$eol".toByteArray(Charsets.US_ASCII))
-                out.write("TEXT 4,$yH,\"1\",0,$fm,$fm,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
+                val xN = if (bigLabel) centerXTsP(clipTsp(l.nama, namaMaxChar(w, fm)).length, fm, w) else 4
+                val xH = if (bigLabel) centerXTsP(clipTsp(l.harga, 24).length, fm, w) else 4
+                out.write("TEXT $xN,$yN,\"1\",0,$fm,$fm,\"${clipTsp(l.nama, namaMaxChar(w, fm))}\"$eol".toByteArray(Charsets.US_ASCII))
+                out.write("TEXT $xH,$yH,\"1\",0,$fm,$fm,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
                 out.write("BARCODE $bcX,$yB,\"${barcodeKodeTsp(l.bc)}\",$barH,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
                 if (bigLabel) {
                     // Nomor barcode di bawah garis (label besar 40x30) biar terbaca & label penuh.
@@ -316,6 +320,10 @@ object EscPosLabel {
 
     /** QR (preview/screen): sama dgn qrGeo print — module & x-tengah. */
     private fun previewQrGeo(bc: String, w: Int, h: Int, topY: Int): Pair<Int, Int> = qrGeo(bc, w, h, topY)
+
+    /** x-center utk TEXT TSPL font "1" (lebar ≈4 dot/char × mul). Label besar (40x30) teks tengah. */
+    private fun centerXTsP(len: Int, mul: Int, w: Int): Int =
+        ((w - len * 4 * mul) / 2).coerceAtLeast(1)
 
     /** Buang karakter yg bisa merusak perintah TSPL. */
     private fun sanitizeTsp(s: String): String = s.filter { it in '0'..'9' || it in 'A'..'Z' || it in 'a'..'z' || it == ' ' }
