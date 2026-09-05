@@ -259,7 +259,8 @@ object EscPosLabel {
         //   - konten per label dari `l` masing2 -> item beda tercetak beda.
         for (l in ls) {
             // Harga 40x30: pasang titik ribuan (Rp 50.000) apa pun bentuk input (& idempoten).
-            val hRibu = if (bigLabel) ribuIdn(l.harga) else l.harga
+            // Harga 40x30 sudah dibersihkan & titik-ribuan dipasang ulang (sanitizeTsp asli membuang '.')
+            val hRibu = if (bigLabel) hargaTsp(l.harga, 24) else l.harga
             out.write("SIZE $w,$h$eol".toByteArray(Charsets.US_ASCII))
             out.write("GAP 16,0$eol".toByteArray(Charsets.US_ASCII))
             out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
@@ -268,9 +269,9 @@ object EscPosLabel {
                 val qrH = (h * 44 / 120).coerceIn(16, (h - barY - 6).coerceAtLeast(16))
                 val bcSan = sanitizeTsp(l.bc)
                 val xN2 = if (bigLabel) centerXTsP(clipTsp(l.nama, namaMaxChar(w, fm)).length, fm, w) else 4
-                val xH2 = if (bigLabel) centerXTsP(clipTsp(hRibu, 24).length, fm, w) else 4
+                val xH2 = if (bigLabel) centerXTsP(hRibu.length, fm, w) else 4
                 out.write("TEXT $xN2,$yN,\"1\",0,$fm,$fm,\"${clipTsp(l.nama, namaMaxChar(w, fm))}\"$eol".toByteArray(Charsets.US_ASCII))
-                val txtH2 = clipTsp(hRibu, 24)
+                val txtH2 = hRibu
                 out.write("TEXT $xH2,$yH,\"1\",0,$fm,$fm,\"$txtH2\"$eol".toByteArray(Charsets.US_ASCII))
                 out.write("BARCODE $xQ,$barY,\"QRCODE\",$qrH,0,0,$mQ,\"$bcSan\"$eol".toByteArray(Charsets.US_ASCII))
             } else {
@@ -278,7 +279,7 @@ object EscPosLabel {
                 val (bcX, bcN) = if (bigLabel) barcodeGeoBigR(l.bc, w) else barcodeGeo(l.bc, w)
                 // label: nama (1 baris) + harga + barcode — sisanya dihilangkan
                 val xN = if (bigLabel) centerXTsP(clipTsp(l.nama, namaMaxChar(w, fm)).length, fm, w) else 4
-                val hTxt = clipTsp(hRibu, 24)
+                val hTxt = hRibu
                 val xH = if (bigLabel) centerXTsP(hTxt.length, fm, w) else 4
                 out.write("TEXT $xN,$yN,\"1\",0,$fm,$fm,\"${clipTsp(l.nama, namaMaxChar(w, fm))}\"$eol".toByteArray(Charsets.US_ASCII))
                 out.write("TEXT $xH,$yH,\"1\",0,$fm,$fm,\"$hTxt\"$eol".toByteArray(Charsets.US_ASCII))
@@ -372,6 +373,20 @@ object EscPosLabel {
     private fun clipTsp(s: String, maxChars: Int): String {
         val clean = sanitizeTsp(s)
         return if (clean.length > maxChars) clean.take(maxChars - 1) + "." else clean
+    }
+
+    /**
+     * Teks HARGA utk TSPL: dibersihkan dulu dari karakter berbahaya (sanitizeTsp buang '.'),
+     * lalu titik-ribuan dipasang ULANG sebelum dicetak. Jadi "Rp 50.000" tidak jadi "Rp 50000".
+     */
+    private fun hargaTsp(s: String, maxChars: Int = 24): String {
+        val clean = sanitizeTsp(s)
+        val dig = clean.filter { it.isDigit() }
+        val base = if (dig.isEmpty()) clean else try {
+            val n = dig.toLong()
+            "Rp " + String.format("%,d", n).replace(',', '.')
+        } catch (_: Exception) { clean }
+        return if (base.length > maxChars) base.take(maxChars - 1) + "." else base
     }
 
     /** Max chars NAMA di label agar muat 1 baris (TSPL font "1" ≈ 4 dot/char × fontMul),
