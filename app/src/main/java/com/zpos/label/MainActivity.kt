@@ -209,16 +209,15 @@ class MainActivity : AppCompatActivity() {
             setTextColor(0xFF888888.toInt())
             setPadding(0, marginTop, 0, 0)
         }
-        val col = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(pad, 0, pad, 0)
-        }
-        { val lp = LinearLayout.LayoutParams(
+        val col = LinearLayout(this)
+        col.orientation = LinearLayout.VERTICAL
+        col.setPadding(pad, 0, pad, 0)
+        fun lpW(mTop: Int) = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
-        ); lp.topMargin = marginTop; txtHarga.layoutParams = lp }()
-        col.addView(txtNama)
-        col.addView(txtHarga)
+        ).apply { topMargin = mTop }
+        col.addView(txtNama, lpW(0))
+        col.addView(txtHarga, lpW(marginTop))
         col.addView(infoStok)
 
         val dialog = AlertDialog.Builder(this)
