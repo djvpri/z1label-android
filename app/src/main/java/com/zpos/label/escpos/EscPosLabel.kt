@@ -229,13 +229,15 @@ object EscPosLabel {
         // + NOMOR BARCODE dicetak di bawah garis. Ukuran lain (25x15=120, 30x20/40x20=160,
         // 50x25=200) MENJAGA perilaku lama (barH proporsional 44/120) — tak berubah.
         val bigLabel = h >= 240
+        // Gap teks↔barcode utk 40x30 = 1 cm (10 mm = 80 dot). Ukuran lain (h<240) gap 0 (perilaku lama).
+        val bigGap = if (bigLabel) 80 else 0
+        val barY = yB + bigGap                       // posisi-y BARCODE (di bawah gap besar)
         val barH = if (bigLabel)
-            // 90% dr ukuran yg lama (sebelumnya ~(h-yB-18)*9/10) — biar tak mendekam penuh,
-            // ruang bawah tetap utk nomor barcode & marjin.
-            (((h - yB - 18) * 9 * 9 / 10) / 10).coerceAtLeast(16)
+            // dari barY, sisakan ~18 dot utk nomor barcode & marjin bawah (anti keluar kanvas)
+            (h - barY - 18).coerceAtLeast(24)
         else
             (h * 44 / 120).coerceIn(16, (h - yB - 6).coerceAtLeast(16))
-        val yBcText = if (bigLabel) yB + barH + 2 else -1
+        val yBcText = if (bigLabel) barY + barH + 2 else -1
         // NOTE multi-label (v1.6.11): PER-LABEL job utuh — setiap label = SIZE h + GAP + CLS +
         // isi (TEXT/BARCODE, y TANPA offset, semua dalam kanvas) + PRINT 1,1 + FORFEED <h>.
         //   - per-label SIZE h = kanvas SATU label (aturan TSPL: SIZE = 1 kanvas; zona idx*step
@@ -248,23 +250,23 @@ object EscPosLabel {
             out.write("GAP 16,0$eol".toByteArray(Charsets.US_ASCII))
             out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
             if (barcode2d) {
-                val (mQ, xQ) = qrGeo(l.bc, w, h, yB)
-                val qrH = (h * 44 / 120).coerceIn(16, (h - yB - 6).coerceAtLeast(16))
+                val (mQ, xQ) = qrGeo(l.bc, w, h, barY)
+                val qrH = (h * 44 / 120).coerceIn(16, (h - barY - 6).coerceAtLeast(16))
                 val bcSan = sanitizeTsp(l.bc)
                 val xN2 = if (bigLabel) centerXTsP(clipTsp(l.nama, namaMaxChar(w, fm)).length, fm, w) else 4
                 val xH2 = if (bigLabel) centerXTsP(clipTsp(l.harga, 24).length, fm, w) else 4
                 out.write("TEXT $xN2,$yN,\"1\",0,$fm,$fm,\"${clipTsp(l.nama, namaMaxChar(w, fm))}\"$eol".toByteArray(Charsets.US_ASCII))
                 out.write("TEXT $xH2,$yH,\"1\",0,$fm,$fm,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
-                out.write("BARCODE $xQ,$yB,\"QRCODE\",$qrH,0,0,$mQ,\"$bcSan\"$eol".toByteArray(Charsets.US_ASCII))
+                out.write("BARCODE $xQ,$barY,\"QRCODE\",$qrH,0,0,$mQ,\"$bcSan\"$eol".toByteArray(Charsets.US_ASCII))
             } else {
-                // bigLabel (40x30): lebar barcode = 90% dr lebar label, tetap x-tengah di label.
-                val (bcX, bcN) = if (bigLabel) barcodeGeoBig(l.bc, w) else barcodeGeo(l.bc, w)
+                // bigLabel (40x30): geser barcode ke KANAN (habiskan ruang kosong kanan), sisakan marjin kecil.
+                val (bcX, bcN) = if (bigLabel) barcodeGeoBigR(l.bc, w) else barcodeGeo(l.bc, w)
                 // label: nama (1 baris) + harga + barcode — sisanya dihilangkan
                 val xN = if (bigLabel) centerXTsP(clipTsp(l.nama, namaMaxChar(w, fm)).length, fm, w) else 4
                 val xH = if (bigLabel) centerXTsP(clipTsp(l.harga, 24).length, fm, w) else 4
                 out.write("TEXT $xN,$yN,\"1\",0,$fm,$fm,\"${clipTsp(l.nama, namaMaxChar(w, fm))}\"$eol".toByteArray(Charsets.US_ASCII))
                 out.write("TEXT $xH,$yH,\"1\",0,$fm,$fm,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
-                out.write("BARCODE $bcX,$yB,\"${barcodeKodeTsp(l.bc)}\",$barH,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
+                out.write("BARCODE $bcX,$barY,\"${barcodeKodeTsp(l.bc)}\",$barH,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
                 if (bigLabel) {
                     // Nomor barcode di bawah garis (label besar 40x30) biar terbaca & label penuh.
                     // Font "1" mul 1: teks center, font ≈4 dot/char.
@@ -308,22 +310,24 @@ object EscPosLabel {
     }
 
     /**
-     * Label 40x30 (bigLabel): barcode LEBIH KECIL — dibuat muat dalam 90% lebar label,
-     * lalu di-TENGAH-kan terhadap lebar penuh label (x center). Non-big tak dipakai.
-     * @return [x-tengah-di-label, narrow]
+     * Label 40x30 (bigLabel): barcode di-GESER KE KANAN (mengisi/menghabiskan ruang kosong kanan),
+     * sisakan marjin kanan kecil. Le bar kiri menyesuaikan; tak pernah memotong kertas.
+     * @return [x-right, narrow]
      */
-    private fun barcodeGeoBig(bc: String, w: Int): Pair<Int, Int> {
+    private fun barcodeGeoBigR(bc: String, w: Int): Pair<Int, Int> {
         val fit = (w * 9 / 10).coerceAtLeast(8)   // area muat barcode = 90% lebar label
-        return if (bc.length == 13 && bc.all { it.isDigit() }) {
+        val (bw, n) = if (bc.length == 13 && bc.all { it.isDigit() }) {
             val n = (fit / 131).coerceAtLeast(1)
-            val bw = 131 * n
-            (((w - bw) / 2).coerceAtLeast(1)) to n
+            (131 * n) to n
         } else {
             val total = (Code128.encodeCDigits(bc) ?: Code128.encodeBText(bc)).totalModul.coerceAtLeast(10)
             val n = ((fit - 4) / total).coerceIn(1, 4)
-            val bw = total * n
-            (((w - bw) / 2).coerceAtLeast(1)) to n
+            (total * n) to n
         }
+        // margin kanan sisakan ~6 dot (≈0.75 mm) supaya barcode klop di tepi lembar & tak tergunting.
+        val pad = 6
+        val x = if (bw > w - 2) 0 else (w - bw - pad).coerceAtLeast(0)
+        return x to n
     }
 
     /**
