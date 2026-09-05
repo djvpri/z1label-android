@@ -241,8 +241,9 @@ object EscPosLabel {
         // + NOMOR BARCODE dicetak di bawah garis. Ukuran lain (25x15=120, 30x20/40x20=160,
         // 50x25=200) MENJAGA perilaku lama (barH proporsional 44/120) — tak berubah.
         val bigLabel = h >= 240
-        // Gap teks↔barcode utk 40x30 = 0,5 cm (5 mm = 40 dot). Ukuran lain (h<240) gap 0 (perilaku lama).
-        val bigGap = if (bigLabel) 40 else 0
+        // Spasi teks(harga)↔barcode utk 40x30 = 0,5 cm (40 dot dr bawah harga). Grund gap6 sudah ada di yB,
+        // jadi tambah 34 di sini. Ukuran lain (h<240) gap 0 (perilaku lama).
+        val bigGap = if (bigLabel) 34 else 0
         val barY = yB + bigGap                       // posisi-y BARCODE (di bawah gap besar)
         val barH = if (bigLabel)
             // dari barY, sisakan ~18 dot utk nomor barcode & marjin bawah (anti keluar kanvas)
