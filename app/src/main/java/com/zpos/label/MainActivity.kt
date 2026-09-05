@@ -21,6 +21,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.GravityCompat
 import androidx.core.widget.doAfterTextChanged
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -135,6 +136,28 @@ class MainActivity : AppCompatActivity() {
         b.btnTambah.setOnClickListener { bukaDialogTambah() }
         b.btnCekUpdate.setOnClickListener { cekUpdate(otomatis = false) }
         b.btnKirimLog.setOnClickListener { kirimLog() }
+
+        // ===== Sidebar: toolband tipis, pengaturan label dipindah ke menu kiri =====
+        b.btnMenu.setOnClickListener {
+            b.drawerRoot.openDrawer(GravityCompat.START)
+        }
+        b.navDrawer.setNavigationItemSelectedListener { item ->
+            when (item.itemId) {
+                com.zpos.label.R.id.menu_printer -> pilihPrinter()
+                com.zpos.label.R.id.menu_kertas -> pilihKertas()
+                com.zpos.label.R.id.menu_sort -> pilihSort()
+                com.zpos.label.R.id.menu_proto -> toggleProto()
+                com.zpos.label.R.id.menu_font -> toggleFont()
+                com.zpos.label.R.id.menu_barcode -> toggleBarcode()
+                com.zpos.label.R.id.menu_bcsrc -> toggleBcSrc()
+                com.zpos.label.R.id.menu_update -> cekUpdate(otomatis = false)
+                com.zpos.label.R.id.menu_log -> kirimLog()
+                com.zpos.label.R.id.menu_keluar -> b.btnLogout.performClick()
+                else -> return@setNavigationItemSelectedListener true
+            }
+            b.drawerRoot.closeDrawers()
+            true
+        }
 
         val savedEmail = prefs.getString("email", "")
         if (savedEmail != null && savedEmail.isNotEmpty()) {

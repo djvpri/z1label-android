@@ -1,230 +1,239 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.drawerlayout.widget.DrawerLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/drawerRoot"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:layout_height="match_parent">
 
-    <!-- ===== Login ===== -->
+    <!-- Isi aplikasi (utama) -->
     <LinearLayout
-        android:id="@+id/loginView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:gravity="center"
-        android:padding="24dp">
+        android:orientation="vertical">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Z1 Label"
-            android:textSize="28sp"
-            android:textStyle="bold"
-            android:textColor="#111" />
-
-        <EditText
-            android:id="@+id/txtEmail"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:hint="Email Z1 Pos"
-            android:inputType="textEmailAddress" />
-
-        <EditText
-            android:id="@+id/txtSandi"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:hint="Password"
-            android:inputType="textPassword" />
-
-        <TextView
-            android:id="@+id/txtUrl"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="Server: https://z1pos.zomet.my.id"
-            android:textSize="12sp"
-            android:textColor="#888" />
-
-        <Button
-                style="@style/BtnRun"
-                android:id="@+id/btnLogin"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:text="Masuk" />
-
-        <TextView
-            android:id="@+id/lblLogin"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text=""
-            android:textSize="13sp" />
-    </LinearLayout>
-
-    <!-- ===== Daftar produk ===== -->
-    <LinearLayout
-        android:id="@+id/mainView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:visibility="gone">
-
+        <!-- ===== Login ===== -->
         <LinearLayout
+            android:id="@+id/loginView"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingHorizontal="8dp"
-            android:paddingTop="8dp">
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="24dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Z1 Label"
+                android:textSize="28sp"
+                android:textStyle="bold"
+                android:textColor="#111" />
 
             <EditText
-                android:id="@+id/txtCari"
-                android:layout_width="0dp"
+                android:id="@+id/txtEmail"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:hint="Cari produk / barcode..."
-                android:inputType="text" />
+                android:layout_marginTop="24dp"
+                android:hint="Email Z1 Pos"
+                android:inputType="textEmailAddress" />
 
+            <EditText
+                android:id="@+id/txtSandi"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:hint="Password"
+                android:inputType="textPassword" />
+
+            <TextView
+                android:id="@+id/txtUrl"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Server: https://z1pos.zomet.my.id"
+                android:textSize="12sp"
+                android:textColor="#888" />
+
+            <Button
+                style="@style/BtnRun"
+                android:id="@+id/btnLogin"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="Masuk" />
+
+            <TextView
+                android:id="@+id/lblLogin"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text=""
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <!-- ===== Layar produk (utama) ===== -->
+        <LinearLayout
+            android:id="@+id/mainView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <!-- Toolbar tipis: menu + cari + tambah -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+
+                <Button
+                    style="@style/BtnRun"
+                    android:id="@+id/btnMenu"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:minWidth="54dp"
+                    android:text="☰"
+                    android:textSize="18sp" />
+
+                <EditText
+                    android:id="@+id/txtCari"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:hint="Cari produk / barcode..."
+                    android:inputType="text" />
+
+                <Button
+                    style="@style/BtnRun"
+                    android:id="@+id/btnTambah"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_marginEnd="4dp"
+                    android:minWidth="86dp"
+                    android:text="＋ Tambah" />
+            </LinearLayout>
+
+            <!-- Tersier lama disembunyikan dr toolbar (dipindah ke sidebar); id dipertahankan utk aksi &
+                 pengaturan label pada tombol tsb. -->
             <Button
                 style="@style/BtnRun"
                 android:id="@+id/btnSort"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:minWidth="56dp"
+                android:visibility="gone"
                 android:text="Urut" />
-
             <Button
                 style="@style/BtnRun"
                 android:id="@+id/btnPaper"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:minWidth="56dp"
-                android:text="Kertas" />
-        </LinearLayout>
-
-            <Button
-                style="@style/BtnRun"
-                android:id="@+id/btnTambah"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="8dp"
-                android:layout_marginTop="6dp"
-                android:text="＋ Tambah Produk" />
+                android:visibility="gone"
+                android:text="Kertas" />
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/listProduk"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:paddingVertical="4dp" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="8dp">
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/listProduk"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:paddingVertical="4dp" />
 
             <Button
                 style="@style/BtnRun"
                 android:id="@+id/btnPrinter"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:visibility="gone"
                 android:text="Pilih Printer Bluetooth..." />
 
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone" >
+                <Button
+                    style="@style/BtnRun"
+                    android:id="@+id/btnProto"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="TSPL Printer Label" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+                    <Button
+                        style="@style/BtnRun"
+                        android:id="@+id/btnFont"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Font: S" />
+                    <Button
+                        style="@style/BtnRun"
+                        android:id="@+id/btnBarcode"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="8dp"
+                        android:text="1D/2D"
+                        android:textSize="12sp"
+                        android:minWidth="52dp" />
+                    <Button
+                        style="@style/BtnRun"
+                        android:id="@+id/btnBcSrc"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="8dp"
+                        android:text="6 digit"
+                        android:textSize="12sp"
+                        android:minWidth="52dp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Aksi penting (Cetak + muat + keluar sistem) tetap di bagian bawah utama -->
             <Button
                 style="@style/BtnRun"
                 android:id="@+id/btnCetak"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginHorizontal="8dp"
                 android:text="Cetak"
                 android:enabled="false" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginHorizontal="8dp"
+                android:layout_marginTop="6dp"
                 android:orientation="horizontal">
-
                 <Button
-                style="@style/BtnRun"
-                android:id="@+id/btnProto"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="TSPL Printer Label" />
-
-                <Button
-                style="@style/BtnRun"
-                android:id="@+id/btnFont"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginStart="8dp"
-                    android:text="Font: S" />
-
-                <Button
-                style="@style/BtnRun"
-                android:id="@+id/btnBarcode"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginStart="8dp"
-                    android:text="1D/2D"
-                    android:textSize="12sp"
-                    android:minWidth="52dp" />
-
-                <Button
-                style="@style/BtnRun"
-                android:id="@+id/btnBcSrc"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginStart="8dp"
-                    android:text="6 digit"
-                    android:textSize="12sp"
-                    android:minWidth="52dp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:orientation="horizontal">
-
-                <Button
-                style="@style/BtnRun"
-                android:id="@+id/btnRefresh"
+                    style="@style/BtnRun"
+                    android:id="@+id/btnRefresh"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="Muat Ulang" />
-
                 <Button
-                style="@style/BtnRun"
-                android:id="@+id/btnLogout"
+                    style="@style/BtnRun"
+                    android:id="@+id/btnLogout"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:layout_marginStart="8dp"
                     android:text="Keluar" />
-
                 <Button
-                style="@style/BtnRun"
-                android:id="@+id/btnCekUpdate"
+                    style="@style/BtnRun"
+                    android:id="@+id/btnCekUpdate"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:layout_marginStart="8dp"
                     android:text="Update" />
-
                 <Button
-                style="@style/BtnRun"
-                android:id="@+id/btnKirimLog"
+                    style="@style/BtnRun"
+                    android:id="@+id/btnKirimLog"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
@@ -237,6 +246,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
+                android:paddingHorizontal="8dp"
                 android:text=""
                 android:textSize="13sp" />
 
@@ -245,9 +255,20 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
+                android:paddingHorizontal="8dp"
                 android:text="Z1 Label"
                 android:textSize="11sp"
                 android:textColor="#888" />
         </LinearLayout>
     </LinearLayout>
-</LinearLayout>
+
+    <!-- ===== Sidebar: pengaturan label tersier ===== -->
+    <com.google.android.material.navigation.NavigationView
+        android:id="@+id/navDrawer"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        app:headerLayout="@layout/drawer_header"
+        app:menu="@menu/menu_sidemenu" />
+
+</androidx.drawerlayout.widget.DrawerLayout>

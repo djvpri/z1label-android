@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <group android:id="@+id/group_cetak">
+        <item
+            android:id="@+id/menu_printer"
+            android:title="Pilih Printer Bluetooth…" />
+        <item
+            android:id="@+id/menu_kertas"
+            android:title="Kertas Label (25×15…)" />
+        <item
+            android:id="@+id/menu_sort"
+            android:title="Urutan (Terbaru / A–Z)" />
+    </group>
+
+    <item android:title="Tampilan Label">
+        <menu>
+            <group android:id="@+id/group_tampilan">
+                <item
+                    android:id="@+id/menu_proto"
+                    android:title="Protokol (TSPL / ESC-POS)" />
+                <item
+                    android:id="@+id/menu_font"
+                    android:title="Font (S / M / L)" />
+                <item
+                    android:id="@+id/menu_barcode"
+                    android:title="Mode Barcode (1D / 2D)" />
+                <item
+                    android:id="@+id/menu_bcsrc"
+                    android:title="Sumber Barcode (Internal / Asli)" />
+            </group>
+        </menu>
+    </item>
+
+    <group android:id="@+id/group_sistem">
+        <item
+            android:id="@+id/menu_update"
+            android:title="Periksa Update" />
+        <item
+            android:id="@+id/menu_log"
+            android:title="Kirim Log" />
+        <item
+            android:id="@+id/menu_keluar"
+            android:title="Keluar" />
+    </group>
+</menu>
