@@ -41,6 +41,7 @@ import java.net.URL
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -708,7 +709,17 @@ class MainActivity : AppCompatActivity() {
                     throw e
                 }
                 val totalLabel = pilih.size * cetakQty
-                val errWr = BluetoothPrinter.write(run)
+                var errWr = BluetoothPrinter.write(run)
+                // Printer mati/putus di tengah (read failed, socket close dll): tutup → connect
+                // ulang otomatis → kirim ulang SEKALI. Tak perlu user tap lagi (buang-buang kertas).
+                if (errWr != null) {
+                    Logger.log(this@MainActivity, "cetak", "auto-reconnect: kirim gagal ($errWr) → connect ulang + retry")
+                    BluetoothPrinter.close()
+                    delay(800)
+                    val errConn2 = BluetoothPrinter.connect(addr)
+                    if (errConn2 == null) errWr = BluetoothPrinter.write(run)
+                    else errWr = errConn2
+                }
                 val versiApp = "v${BuildConfig.VERSION_NAME}(${BuildConfig.VERSION_CODE})"
                 if (errWr != null) {
                     Logger.log(this@MainActivity, "cetak", "[$versiApp] kirim GAGAL: $errWr")
