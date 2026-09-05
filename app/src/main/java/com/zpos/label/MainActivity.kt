@@ -239,7 +239,10 @@ class MainActivity : AppCompatActivity() {
                 btn.isEnabled = false
                 btn.text = "Menyimpan…"
                 scope.launch {
-                    val hasil = ZposApi.simpanProduk(nama, harga.toDouble())
+                    val kategori = ZposApi.kategoriUtama()
+                    val hasil: Result<Long?> =
+                        if (kategori.isSuccess) ZposApi.simpanProduk(nama, harga.toDouble(), kategori.getOrThrow())
+                        else Result.failure(kategori.exceptionOrNull()!!)
                     withContext(Dispatchers.Main) {
                         if (hasil.isSuccess) {
                             dialog.dismiss()

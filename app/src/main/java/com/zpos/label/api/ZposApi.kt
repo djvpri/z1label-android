@@ -87,14 +87,42 @@ object ZposApi {
         } catch (_: Exception) { v }
     }
 
+    /** Kategori id (tenant aktif) yg dipakai utk produk baru: preferensi "umum", fallback pertama. */
+    fun kategoriUtama(): Result<Long> {
+        return try {
+            val conn = open("$baseUrl/api/kategori", null)
+            try {
+                val code = conn.responseCode
+                if (code !in 200..299) return Result.failure(IllegalStateException("Gagal muat kategori (HTTP $code)"))
+                val text = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                val arr = try { org.json.JSONArray(text) } catch (_: Exception) {
+                    org.json.JSONObject(text).optJSONArray("rows")
+                        ?: org.json.JSONObject(text).optJSONArray("data")
+                        ?: org.json.JSONArray()
+                }
+                // preferensi dgn nama unit umum dulu (terjemahan bhs-server tak tentu), lalu baris pertama.
+                val id = (0 until arr.length()).map { i ->
+                    val o = arr.getJSONObject(i)
+                    o.optLong("id") to o.optString("nama").lowercase()
+                }.filter { it.first > 0L }.let { list ->
+                    val umum = list.find { it.second.contains("umum") || it.second == "lain" || it.second.contains("semua") }
+                    umum?.first ?: list.firstOrNull()?.first
+                }
+                if (id == null) Result.failure(IllegalStateException("Belum ada kategori. Buat dulu kategori di ZPos."))
+                else Result.success(id)
+            } finally { conn.disconnect() }
+        } catch (e: Exception) { Result.failure(e) }
+    }
+
     /** Simpan produk baru ke server (tenant toko aktif). Stok awal = 20 dr app label. */
-    fun simpanProduk(nama: String, harga: Double): Result<Long?> {
+    fun simpanProduk(nama: String, harga: Double, kategoriId: Long): Result<Long?> {
         if (cookie.isEmpty()) return Result.failure(IllegalStateException("Belum login"))
         return try {
             val body = JSONObject()
                 .put("nama", nama)
                 .put("harga", harga)      // server: z.number().positive
                 .put("stok", 20)          // server default 0; app label simpan otomatis 20
+                .put("kategori_id", kategoriId)   // WAJIB: tanpa ini zod server tolak validasi
                 .toString().toByteArray(Charsets.UTF_8)
             val conn = URL("$baseUrl/api/produk").openConnection() as HttpURLConnection
             conn.connectTimeout = 15000
