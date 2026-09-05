@@ -87,6 +87,40 @@ object ZposApi {
         } catch (_: Exception) { v }
     }
 
+    /** Simpan produk baru ke server (tenant toko aktif). Stok awal = 20 dr app label. */
+    fun simpanProduk(nama: String, harga: Double): Result<Long?> {
+        if (cookie.isEmpty()) return Result.failure(IllegalStateException("Belum login"))
+        return try {
+            val body = JSONObject()
+                .put("nama", nama)
+                .put("harga", harga)      // server: z.number().positive
+                .put("stok", 20)          // server default 0; app label simpan otomatis 20
+                .toString().toByteArray(Charsets.UTF_8)
+            val conn = URL("$baseUrl/api/produk").openConnection() as HttpURLConnection
+            conn.connectTimeout = 15000
+            conn.readTimeout = 30000
+            conn.requestMethod = "POST"
+            conn.doOutput = true
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            conn.setRequestProperty("Cookie", "zpos_token=$cookie")
+            try {
+                conn.outputStream.use { it.write(body) }
+                val code = conn.responseCode
+                val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+                val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }?.take(400).orEmpty()
+                if (code in 200..299) {
+                    val id = try { JSONObject(text).optLong("id").takeIf { it > 0 } } catch (_: Exception) { null }
+                    Result.success(id)
+                } else {
+                    val msg = try { JSONObject(text).optString("error").ifBlank { "HTTP $code" } } catch (_: Exception) { "HTTP $code: $text" }
+                    Result.failure(IllegalStateException(msg))
+                }
+            } finally { conn.disconnect() }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     private fun open(url: String, body: ByteArray?): HttpURLConnection {
         val conn = URL(url).openConnection() as HttpURLConnection
         conn.connectTimeout = 15000

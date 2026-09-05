@@ -13,7 +13,9 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.EditText
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -130,6 +132,7 @@ class MainActivity : AppCompatActivity() {
         b.btnBarcode.setOnClickListener { toggleBarcode() }
         b.btnBcSrc.setOnClickListener { toggleBcSrc() }
         b.btnCetak.setOnClickListener { cetak() }
+        b.btnTambah.setOnClickListener { bukaDialogTambah() }
         b.btnCekUpdate.setOnClickListener { cekUpdate(otomatis = false) }
         b.btnKirimLog.setOnClickListener { kirimLog() }
 
@@ -155,6 +158,82 @@ class MainActivity : AppCompatActivity() {
         cekUpdate(otomatis = true)
         // auto-connect printer tersimpan (konsep GPrinter: buka app = langsung terhubung)
         autoSambungPrinter()
+    }
+
+    /** Bersihkan & ambil nilai rupiah utuh (buang ribuan/Rp/mata uang). */
+    private fun parseHargaUang(t: String): Long {
+        val digits = t.filter { it.isDigit() }
+        return digits.toLongOrNull() ?: 0L
+    }
+
+    /** Dialog tambah produk: isi Nama+Harga -> langsung simpan ke server (tenant toko). Stok awal = 20. */
+    private fun bukaDialogTambah() {
+        val density = resources.displayMetrics.density
+        val pad = (18 * density).toInt()
+        val marginTop = (10 * density).toInt()
+        val txtNama = EditText(this).apply {
+            hint = "Nama produk"
+            setSingleLine(true)
+        }
+        val txtHarga = EditText(this).apply {
+            hint = "Harga (Rp, tanpa titik)"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setSingleLine(true)
+        }
+        val infoStok = android.widget.TextView(this).apply {
+            text = "Stok awal otomatis: 20"
+            textSize = 12f
+            setTextColor(0xFF888888.toInt())
+            setPadding(0, marginTop, 0, 0)
+        }
+        val col = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(pad, 0, pad, 0)
+        }
+        { val lp = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ); lp.topMargin = marginTop; txtHarga.layoutParams = lp }()
+        col.addView(txtNama)
+        col.addView(txtHarga)
+        col.addView(infoStok)
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Tambah Produk")
+            .setView(col)
+            .setNegativeButton("Batal", null)
+            .setPositiveButton("Simpan", null)   // listener dipasang manual biar dialog tdk auto-tutup saat error
+            .create()
+
+        dialog.setOnShowListener {
+            val btn = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            btn.setOnClickListener {
+                val nama = txtNama.text.toString().trim()
+                val harga = parseHargaUang(txtHarga.text.toString())
+                if (nama.isEmpty()) { Toast.makeText(this, "Nama produk wajib diisi", Toast.LENGTH_SHORT).show(); return@setOnClickListener }
+                if (harga <= 0L) { Toast.makeText(this, "Harga harus lebih dari 0", Toast.LENGTH_SHORT).show(); return@setOnClickListener }
+                // cepat: jangan izin double-tap
+                if (!btn.isEnabled) return@setOnClickListener
+                btn.isEnabled = false
+                btn.text = "Menyimpan…"
+                scope.launch {
+                    val hasil = ZposApi.simpanProduk(nama, harga.toDouble())
+                    withContext(Dispatchers.Main) {
+                        if (hasil.isSuccess) {
+                            dialog.dismiss()
+                            Toast.makeText(this@MainActivity, "Produk tersimpan", Toast.LENGTH_SHORT).show()
+                            loadProduk()   // refresh list; barcode internal diisi server saat GET ?semua=1
+                        } else {
+                            val m = hasil.exceptionOrNull()?.message ?: "Gagal menyimpan"
+                            btn.isEnabled = true
+                            btn.text = "Simpan"
+                            Toast.makeText(this@MainActivity, m, Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+            }
+        }
+        dialog.show()
     }
 
     /** Connect otomatis ke printer tersimpan di background; tidak butuh tekan. */

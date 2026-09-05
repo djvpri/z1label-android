@@ -106,6 +106,15 @@
                 android:text="Kertas" />
         </LinearLayout>
 
+            <Button
+                style="@style/BtnRun"
+                android:id="@+id/btnTambah"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="8dp"
+                android:layout_marginTop="6dp"
+                android:text="＋ Tambah Produk" />
+
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/listProduk"
             android:layout_width="match_parent"
