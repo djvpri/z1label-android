@@ -230,7 +230,9 @@ object EscPosLabel {
         // 50x25=200) MENJAGA perilaku lama (barH proporsional 44/120) — tak berubah.
         val bigLabel = h >= 240
         val barH = if (bigLabel)
-            ((h - yB - 18) * 9 / 10).coerceAtLeast(16)   // ~90% isi — tak terlalu penuh, sisakan ruang bawah
+            // 90% dr ukuran yg lama (sebelumnya ~(h-yB-18)*9/10) — biar tak mendekam penuh,
+            // ruang bawah tetap utk nomor barcode & marjin.
+            (((h - yB - 18) * 9 * 9 / 10) / 10).coerceAtLeast(16)
         else
             (h * 44 / 120).coerceIn(16, (h - yB - 6).coerceAtLeast(16))
         val yBcText = if (bigLabel) yB + barH + 2 else -1
@@ -255,7 +257,8 @@ object EscPosLabel {
                 out.write("TEXT $xH2,$yH,\"1\",0,$fm,$fm,\"${clipTsp(l.harga, 24)}\"$eol".toByteArray(Charsets.US_ASCII))
                 out.write("BARCODE $xQ,$yB,\"QRCODE\",$qrH,0,0,$mQ,\"$bcSan\"$eol".toByteArray(Charsets.US_ASCII))
             } else {
-                val (bcX, bcN) = barcodeGeo(l.bc, w)
+                // bigLabel (40x30): lebar barcode = 90% dr lebar label, tetap x-tengah di label.
+                val (bcX, bcN) = if (bigLabel) barcodeGeoBig(l.bc, w) else barcodeGeo(l.bc, w)
                 // label: nama (1 baris) + harga + barcode — sisanya dihilangkan
                 val xN = if (bigLabel) centerXTsP(clipTsp(l.nama, namaMaxChar(w, fm)).length, fm, w) else 4
                 val xH = if (bigLabel) centerXTsP(clipTsp(l.harga, 24).length, fm, w) else 4
@@ -302,6 +305,25 @@ object EscPosLabel {
         val bw = total * n
         val x = ((wDots - bw) / 2).coerceAtLeast(1)
         return x to n
+    }
+
+    /**
+     * Label 40x30 (bigLabel): barcode LEBIH KECIL — dibuat muat dalam 90% lebar label,
+     * lalu di-TENGAH-kan terhadap lebar penuh label (x center). Non-big tak dipakai.
+     * @return [x-tengah-di-label, narrow]
+     */
+    private fun barcodeGeoBig(bc: String, w: Int): Pair<Int, Int> {
+        val fit = (w * 9 / 10).coerceAtLeast(8)   // area muat barcode = 90% lebar label
+        return if (bc.length == 13 && bc.all { it.isDigit() }) {
+            val n = (fit / 131).coerceAtLeast(1)
+            val bw = 131 * n
+            (((w - bw) / 2).coerceAtLeast(1)) to n
+        } else {
+            val total = (Code128.encodeCDigits(bc) ?: Code128.encodeBText(bc)).totalModul.coerceAtLeast(10)
+            val n = ((fit - 4) / total).coerceIn(1, 4)
+            val bw = total * n
+            (((w - bw) / 2).coerceAtLeast(1)) to n
+        }
     }
 
     /**
