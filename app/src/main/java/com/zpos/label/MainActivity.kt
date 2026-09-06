@@ -1,13 +1,17 @@
 package com.zpos.label
 
 import android.Manifest
+import android.app.Activity
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
+import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -16,6 +20,8 @@ import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -25,6 +31,7 @@ import androidx.core.view.GravityCompat
 import androidx.core.widget.doAfterTextChanged
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.zpos.label.api.NamaDariFoto
 import com.zpos.label.api.Produk
 import com.zpos.label.api.ZposApi
 import com.zpos.label.api.barcodeLabel
@@ -60,6 +67,7 @@ class MainActivity : AppCompatActivity() {
     private var semua: MutableList<Produk> = mutableListOf()
     private var tampil: MutableList<Produk> = mutableListOf()
     private val selected = HashSet<Long>()
+    private var antriCetakQty = 0   // diisi tandaiCetakQty() bila produk baru mau cetak sekali scr otomatis
     private lateinit var adapter: ProdukAdapter
 
     private var printerAddress: String? = null
@@ -77,6 +85,39 @@ class MainActivity : AppCompatActivity() {
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
             val ok = grants.values.all { it }
             Logger.log(this, "bt", "hasil izin: " + grants.entries.joinToString { "${it.key}=${it.value}" } + " -> totalOk=$ok")
+        }
+
+    // ---- Tambah via Foto: pilih banyak gambar (tiap foto = 1 produk) ----
+    // Elemen per baris yg nge-hold isian user; dipakai pas Simpan Semua.
+    class BarisFoto(
+        val uriSumber: Uri,
+        val nama: EditText,
+        val harga: EditText,
+        val labelQty: EditText,
+        val statusNama: TextView
+    )
+    private val barisFoto = ArrayList<BarisFoto>()
+    private var dialogFotoDlg: AlertDialog? = null       // dialog scroll yg lagi kebuka
+    private var fotoDialogBtn: android.widget.Button? = null  // tombol Simpan (disable saat jalan)
+
+    // Photo Picker native (API 33+): pilih banyak sekaligus, tanpa permission.
+    private val fotoPickLauncher =
+        registerForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { uris ->
+            if (uris.isNotEmpty()) bukaTambahFoto(uris)
+            // else: batal/tak pilih -> diam
+        }
+
+    // Fallback <33: ACTION_OPEN_DOCUMENT dengan EXTRA_ALLOW_MULTIPLE.
+    private val galeriDocLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+            if (r.resultCode != Activity.RESULT_OK) return@registerForActivityResult
+            val data = r.data ?: return@registerForActivityResult
+            val uris = ArrayList<Uri>()
+            data.clipData?.let { clip ->
+                for (i in 0 until clip.itemCount) clip.getItemAt(i).uri?.let { uris.add(it) }
+            }
+            data.data?.let { uris.add(it) }
+            if (uris.distinct().size > 0) bukaTambahFoto(uris.distinct())
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -135,7 +176,7 @@ class MainActivity : AppCompatActivity() {
         b.btnBarcode.setOnClickListener { toggleBarcode() }
         b.btnBcSrc.setOnClickListener { toggleBcSrc() }
         b.btnCetak.setOnClickListener { cetak() }
-        b.btnTambah.setOnClickListener { bukaDialogTambah() }
+        b.btnTambah.setOnClickListener { pilihMetodeTambah() }
         b.btnCekUpdate.setOnClickListener { cekUpdate(otomatis = false) }
         b.btnKirimLog.setOnClickListener { kirimLog() }
 
@@ -189,6 +230,289 @@ class MainActivity : AppCompatActivity() {
     private fun parseHargaUang(t: String): Long {
         val digits = t.filter { it.isDigit() }
         return digits.toLongOrNull() ?: 0L
+    }
+
+    // ===================== Tambah produk via FOTO (v1.6.26) =====================
+    // Pilih banyak gambar (tiap foto = 1 produk). Nama auto diisi Gemini lewat server
+    // z1pos (POST /api/produk/nama-dari-foto) — GEMINI_API_KEY tak pernah di app.
+    // Harga tetap manual. "Berapa lembar label" utk produk yg mau langsung dicetak.
+
+    private fun pilihMetodeTambah() {
+        val opts = arrayOf("🖊  Tambah Manual (ketik nama)", "📷  Tambah dari Foto (auto nama AI)")
+        AlertDialog.Builder(this)
+            .setTitle("Tambah Produk")
+            .setItems(opts) { _, i ->
+                if (i == 0) bukaDialogTambah()
+                else pilihFotoUtkProduk()
+            }
+            .setNegativeButton("Batal", null)
+            .show()
+    }
+
+    /** Buka pemilih galeri multi gambar (internal tab: photo picker API 33+, fallback ACTION_OPEN_DOCUMENT). */
+    private fun pilihFotoUtkProduk() {
+        Logger.log(this, "produk", "tambah-lewat-foto: buka pemilih gambar")
+        if (Build.VERSION.SDK_INT >= 33) {
+            fotoPickLauncher.launch(androidx.activity.result.PickVisualMediaRequest())
+        } else {
+            val i = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "image/*"
+                putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+            }
+            galeriDocLauncher.launch(i)
+        }
+    }
+
+    /** Decode content uri -> data URI JPEG kecil utk kirim Gemini / thumb. Panggil di IO. */
+    private fun fotoDataUri(context: Context, uri: Uri, maxSide: Int = 900): String? {
+        return try {
+            val cr: ContentResolver = context.contentResolver
+            val r = cr.openInputStream(uri) ?: return null
+            r.use { input ->
+                val bmp = BitmapFactory.decodeStream(input) ?: return null
+                val s = Math.max(bmp.width, bmp.height)
+                val sc = if (s > maxSide && maxSide > 0) maxSide.toFloat() / s else 1f
+                val out = if (sc < 1f) {
+                    Bitmap.createScaledBitmap(bmp, (bmp.width * sc).toInt(), (bmp.height * sc).toInt(), true)
+                } else bmp
+                if (out !== bmp && !out.isRecycled) { /* keep */ }
+                val bos = java.io.ByteArrayOutputStream()
+                out.compress(Bitmap.CompressFormat.JPEG, 82, bos)
+                if (out !== bmp) runCatching { out.recycle() }
+                "data:image/jpeg;base64," + android.util.Base64.encodeToString(bos.toByteArray(), android.util.Base64.NO_WRAP)
+            }
+        } catch (e: Exception) {
+            Logger.log(this, "produk", "foto read gagal $uri: ${e::class.simpleName}")
+            null
+        }
+    }
+
+    // Dekor visual utk sub-judul tiap baris foto.
+    private fun teksKecil(s: String, warna: Int): TextView {
+        val tv = TextView(this)
+        tv.text = s
+        tv.textSize = 12f
+        tv.setTextColor(warna)
+        return tv
+    }
+
+    /** Bangun dialog berisi N baris (foto+nama AI+harga+jumlah label) dari uris terpilih. */
+    private fun bukaTambahFoto(uris: List<Uri>) {
+        Logger.log(this, "produk", "foto terpilih ${uris.size}")
+        if (uris.size > 20) {
+            Toast.makeText(this, "Maks 20 produk sekaligus", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val density = resources.displayMetrics.density
+        val pad = (16 * density).toInt()
+        val padKecil = (8 * density).toInt()
+        val marginTop = (8 * density).toInt()
+
+        val container = LinearLayout(this)
+        container.orientation = LinearLayout.VERTICAL
+        container.setPadding(pad, 0, pad, 0)
+        val scroll = ScrollView(this)
+        scroll.addView(container)
+        fun lp(mTop: Int): LinearLayout.LayoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = mTop }
+
+        container.addView(
+            teksKecil("Nama otomatis dari AI (bisa diedit). Harga & jumlah label diisi manual.", 0xFF666666.toInt()),
+            lp(0)
+        )
+
+        barisFoto.clear()
+        for (uri in uris) {
+            // ----- kartu per foto (satu produk) -----
+            val kartu = LinearLayout(this)
+            kartu.orientation = LinearLayout.VERTICAL
+            kartu.setPadding(pad, padKecil, pad, padKecil)
+            kartu.setBackgroundColor(0xFFF3F4F6.toInt())
+
+            val header = LinearLayout(this)
+            header.orientation = LinearLayout.HORIZONTAL
+            // thumbnail
+            val img = ImageView(this)
+            val lpImg = LinearLayout.LayoutParams((56 * density).toInt(), (56 * density).toInt())
+            header.addView(img, lpImg)
+            val nama = EditText(this)
+            nama.hint = "Nama produk (auto AI)"
+            nama.setSingleLine(true)
+            val lpNama = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            lpNama.leftMargin = padKecil
+            header.addView(nama, lpNama)
+            val statusNama = TextView(this)
+            kartu.addView(header, lp(0))
+            kartu.addView(statusNama, lp(2))
+
+            val harga = EditText(this)
+            harga.hint = "Harga (Rp, tanpa titik)"
+            harga.inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            harga.setSingleLine(true)
+            kartu.addView(harga, lp(marginTop))
+
+            val barisLbl = LinearLayout(this)
+            barisLbl.orientation = LinearLayout.HORIZONTAL
+            barisLbl.gravity = android.view.Gravity.CENTER_VERTICAL
+            val teksLbl = teksKecil("Cetak label (lembar):  ", 0xFF333333.toInt())
+            val labelQty = EditText(this)
+            labelQty.hint = "0"
+            labelQty.inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            labelQty.setSingleLine(true)
+            labelQty.setText("0")
+            val lpQty = LinearLayout.LayoutParams((72 * density).toInt(), LinearLayout.LayoutParams.WRAP_CONTENT)
+            barisLbl.addView(teksLbl)
+            barisLbl.addView(labelQty, lpQty)
+            kartu.addView(barisLbl, lp(marginTop))
+
+            container.addView(kartu, lp(marginTop))
+            barisFoto.add(BarisFoto(uri, nama, harga, labelQty, statusNama))
+
+            // thumb dari uri (IO, kecil) — biar user lihat foto yg mana
+            scope.launch {
+                val d = fotoDataUri(this@MainActivity, uri, maxSide = 400)
+                val bmp = d?.let { imgUriToBmp(it) }
+                withContext(Dispatchers.Main) {
+                    if (bmp != null) img.setImageBitmap(bmp)
+                }
+            }
+        }
+
+        val dlg = AlertDialog.Builder(this)
+            .setTitle("Tambah ${uris.size} produk dari Foto")
+            .setView(scroll)
+            .setNegativeButton("Batal", null)
+            .setPositiveButton("Simpan Semua", null)  // listener manual (jl intercept saat error)
+            .create()
+        dlg.setOnShowListener {
+            val btn = dlg.getButton(AlertDialog.BUTTON_POSITIVE)
+            fotoDialogBtn = btn
+            btn.setOnClickListener { simpanSemuaFoto(dlg, btn) }
+            // jalankan deteksi nama Ai serentak utk tiap baris (display hasil saat diisi)
+            for (b in barisFoto) b.statusNama.text = "Mendeteksi nama AI…"
+            for (b in barisFoto) scope.launch { deteksiNamaUtk(b) }
+        }
+        dialogFotoDlg = dlg
+        dlg.show()
+    }
+
+    /** panggil Gemini-lewat-server utk satu baris, isi nama (editable) + saran harga bila kosong. */
+    private suspend fun deteksiNamaUtk(b: BarisFoto) {
+        val d = withContext(Dispatchers.IO) { fotoDataUri(this@MainActivity, b.uriSumber, maxSide = 900) }
+        if (d == null) {
+            withContext(Dispatchers.Main) { b.statusNama.text = "Gagal baca foto — ketik manual" }
+            return
+        }
+        val res = withContext(Dispatchers.IO) { ZposApi.namaDariFoto(d) }
+        withContext(Dispatchers.Main) {
+            if (res.isSuccess) {
+                val o = res.getOrNull() ?: return@withContext
+                if (o.nama != null) {
+                    b.nama.setText(o.nama)
+                    if (o.adaTeks == false) b.statusNama.text = "Nama dari penampakan (tanpa label) — edit bila perlu"
+                    else b.statusNama.text = "✓ Nama dari AI (edit bila perlu)"
+                } else {
+                    b.statusNama.text = "Nama tak terdeteksi — ketik manual"
+                }
+                // harga AI hanya isi bila field masih kosong (saran; user bisa ubah)
+                if (o.harga != null && b.harga.text.isNullOrBlank()) b.harga.setText(o.harga)
+            } else {
+                val msg = res.exceptionOrNull()?.message ?: "Gagal"
+                b.statusNama.text = "Deteksi gagal — ketik manual ($msg)"
+            }
+        }
+    }
+
+    /** decode data uri "data:image..." jadi Bitmap utk thumb (jalan di bg thread). */
+    private fun imgUriToBmp(dataUri: String): Bitmap? = try {
+        val b64 = dataUri.substringAfter("base64,")
+        val bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT)
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+    } catch (e: Exception) { null }
+
+    /** Simpan semua baris valid ke server; show per-baris error; refresh list. */
+    private fun simpanSemuaFoto(dlg: AlertDialog, btn: android.widget.Button) {
+        // baca nilai (nama/harga mungkin sekalian diisi)
+        val rows = barisFoto.map { b ->
+            val nama = b.nama.text.toString().trim()
+            val harga = parseHargaUang(b.harga.text.toString())
+            val qty = (b.labelQty.text.toString().toIntOrNull() ?: 0).coerceAtLeast(0)
+            Triple(b, nama, Pair(harga, qty))
+        }
+        // baris tanpa nama/harga tak disimpan — show sekali
+        val invalid = rows.filter { it.second.isEmpty() }
+        if (invalid.isNotEmpty()) {
+            Toast.makeText(this, "Nama wajib diisi utk ${invalid.size} produk (isikan manual bila AI gagal)", Toast.LENGTH_LONG).show()
+            return
+        }
+        if (rows.any { it.third.first <= 0L }) {
+            Toast.makeText(this, "Harga wajib lebih dari 0 utk tiap produk", Toast.LENGTH_LONG).show()
+            return
+        }
+        if (!btn.isEnabled) return
+        btn.isEnabled = false
+        btn.text = "Menyimpan…"
+        scope.launch {
+            val kategori = ZposApi.kategoriUtama()
+            val kat: Long? = kategori.getOrNull()
+            var ok = 0
+            val dug = HashMap<Long, Int>()   // produkId -> qty label bila >0 (setelah simpan)
+            for (t in rows) {
+                val nama = t.second
+                val harga = t.third.first.toDouble()
+                val qty = t.third.second
+                if (kat == null) break
+                val res = ZposApi.simpanProduk(nama, harga, kat)
+                if (res.isSuccess) {
+                    ok++
+                    res.getOrNull()?.let { if (it != null && qty > 0) dug[it] = qty }
+                }
+            }
+            val hasil = if (kat == null) "Gagal: tak ada kategori di toko"
+                else if (ok == rows.size) "Tersimpan $ok produk"
+                else "Tersimpan $ok/${rows.size} (cek error)"
+            Logger.log(this@MainActivity, "produk", "tambah-foto simpan: $hasil (qtyLabel=${dug.size})")
+            withContext(Dispatchers.Main) {
+                if (kat == null) {
+                    btn.isEnabled = true; btn.text = "Simpan Semua"
+                    Toast.makeText(this@MainActivity, hasil, Toast.LENGTH_LONG).show()
+                } else {
+                    dlg.dismiss()
+                    dialogFotoDlg = null
+                    Toast.makeText(this@MainActivity, hasil, Toast.LENGTH_SHORT).show()
+                    loadProduk { tandaiCetakQty(dug) }   // refresh lalu tandai produk qty utk cetak
+                }
+            }
+        }
+    }
+
+    /** Setelah simpan: produk dgn qty label>0 masuk ke antrian cetak (pilih + qty). Jalan di Main (pasca loadProduk sukses). */
+    private fun tandaiCetakQty(dug: Map<Long, Int>) {
+        if (dug.isEmpty()) return
+        val targetIds = dug.keys
+        val diList = semua.filter { it.id in targetIds }
+        if (diList.isEmpty()) {
+            Toast.makeText(this@MainActivity, "Produk tersimpan. Pilih utk dicetak.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        selected.clear()
+        diList.forEach { selected.add(it.id) }
+        adapter.updateSelected(selected)
+        b.btnCetak.isEnabled = true
+        // qty global utk cetakan utk produk baru: hanya bila 1 produk dgn qty>0 (pola qty seragam di cetak)
+        val hanyaSatu = diList.size == 1
+        antriCetakQty = if (hanyaSatu) dug[diList.first().id] ?: 1 else 0
+        if (hanyaSatu && antriCetakQty > 1) {
+            Toast.makeText(this@MainActivity, "${diList.size} produk dipilih. Ketuk Cetak utk $antriCetakQty lembar.", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this@MainActivity, "${diList.size} produk dipilih. Ketuk Cetak.", Toast.LENGTH_SHORT).show()
+        }
     }
 
     /** Dialog tambah produk: isi Nama+Harga -> langsung simpan ke server (tenant toko). Stok awal = 20. */
@@ -360,7 +684,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun loadProduk() {
+    private fun loadProduk(afterSukses: (() -> Unit)? = null) {
         b.lblStatus.text = "Memuat produk..."
         scope.launch {
             val res = ZposApi.daftarProduk()
@@ -373,6 +697,7 @@ class MainActivity : AppCompatActivity() {
                     filterList(b.txtCari.text.toString())
                     b.btnCetak.isEnabled = false
                     b.lblStatus.text = "${semua.size} produk"
+                    afterSukses?.invoke()
                 }.onFailure { e ->
                     Logger.log(this@MainActivity, "load", "gagal: ${e.message}")
                     b.lblStatus.text = "Gagal muat: ${e.message}"
@@ -657,7 +982,10 @@ class MainActivity : AppCompatActivity() {
         if (!bluetoothOk(true)) { b.btnCetak.isEnabled = true; return }
         scope.launch {
             val pilih = tampil.filter { it.id in selected }
-            var cetakQty = 1   // jumlah lembar tiap produk (default 1; diisi bila preview tampil)
+            // Qty praisi dari tambah-foto (single produk) bila ada; 0 = pakai default 1.
+            val praisiQty = if (pilih.size == 1 && antriCetakQty > 0) antriCetakQty else 1
+            var cetakQty = if (praisiQty > 1) praisiQty else 1
+            antriCetakQty = 0   // konsumsi sekali (reset)
             if (pilih.isEmpty()) { withContext(Dispatchers.Main){ b.btnCetak.isEnabled=true; b.lblStatus.text="Pilih produk dulu" }; return@launch }
 
             Logger.log(this@MainActivity, "cetak", "mulai ${pilih.size} label, kertas ${paperW}x${paperH}mm, print ${printerAddress ?: "-"}")

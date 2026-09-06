@@ -26,6 +26,14 @@ fun barcodeLabel(p: Produk, preferAsli: Boolean = false): String {
     else internal ?: asli ?: Code128.generateV3(p.id)
 }
 
+/** Hasil gemini "foto -> nama" dari server z1pos (proxy, tak ada key di app). */
+data class NamaDariFoto(
+    val nama: String?,
+    val harga: String?,     // harga terbaca jelas dari label (optional)
+    val adaTeks: Boolean?,  // false = tak ada label keterbacaan; nama dr penampakan
+    val error: String?      // non-null bila endpoint balas error (mis. key belum set)
+)
+
 object ZposApi {
 
     @Volatile var baseUrl: String = "https://z1pos.zomet.my.id"
@@ -141,6 +149,41 @@ object ZposApi {
                     Result.success(id)
                 } else {
                     val msg = try { JSONObject(text).optString("error").ifBlank { "HTTP $code" } } catch (_: Exception) { "HTTP $code: $text" }
+                    Result.failure(IllegalStateException(msg))
+                }
+            } finally { conn.disconnect() }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /** Foto → nama (proxy server z1pos → Gemini). Kirim data URI stl dikompres app. */
+    fun namaDariFoto(fotoDataUri: String): Result<NamaDariFoto> {
+        if (cookie.isEmpty()) return Result.failure(IllegalStateException("Belum login"))
+        return try {
+            val body = JSONObject().put("foto", fotoDataUri).toString().toByteArray(Charsets.UTF_8)
+            val conn = URL("$baseUrl/api/produk/nama-dari-foto").openConnection() as HttpURLConnection
+            conn.connectTimeout = 15000
+            conn.readTimeout = 40000
+            conn.requestMethod = "POST"
+            conn.doOutput = true
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            conn.setRequestProperty("Cookie", "zpos_token=$cookie")
+            try {
+                conn.outputStream.use { it.write(body) }
+                val code = conn.responseCode
+                val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+                val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }?.take(2000).orEmpty()
+                if (code in 200..299) {
+                    val o = try { JSONObject(text) } catch (_: Exception) { JSONObject() }
+                    Result.success(NamaDariFoto(
+                        nama = o.optString("nama").takeIf { it.isNotBlank() },
+                        harga = o.optString("harga").takeIf { it.isNotBlank() && it != "null" },
+                        adaTeks = if (o.has("adaTeks") && !o.isNull("adaTeks")) o.optBoolean("adaTeks") else null,
+                        error = null
+                    ))
+                } else {
+                    val msg = try { JSONObject(text).optString("error").ifBlank { "HTTP $code" } } catch (_: Exception) { "HTTP $code" }
                     Result.failure(IllegalStateException(msg))
                 }
             } finally { conn.disconnect() }
