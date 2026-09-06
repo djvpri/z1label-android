@@ -529,10 +529,14 @@ class MainActivity : AppCompatActivity() {
         val marginTop = (10 * density).toInt()
         val txtNama = EditText(this).apply {
             hint = "Nama produk"
+            setTextColor(0xFF111111.toInt())
+            setHintTextColor(0xFF667085.toInt())
             setSingleLine(true)
         }
         val txtHarga = EditText(this).apply {
             hint = "Harga (Rp, tanpa titik)"
+            setTextColor(0xFF111111.toInt())
+            setHintTextColor(0xFF667085.toInt())
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
             setSingleLine(true)
         }
@@ -553,7 +557,7 @@ class MainActivity : AppCompatActivity() {
         col.addView(txtHarga, lpW(marginTop))
         col.addView(infoStok)
 
-        val dialog = AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this, android.R.style.Theme_Material_Light_Dialog_Alert)
             .setTitle("Tambah Produk")
             .setView(col)
             .setNegativeButton("Batal", null)
