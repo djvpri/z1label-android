@@ -239,7 +239,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun pilihMetodeTambah() {
         val opts = arrayOf("🖊  Tambah Manual (ketik nama)", "📷  Tambah dari Foto (auto nama AI)")
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, android.R.style.Theme_Material_Light_Dialog_Alert)
             .setTitle("Tambah Produk")
             .setItems(opts) { _, i ->
                 if (i == 0) bukaDialogTambah()
@@ -340,6 +340,8 @@ class MainActivity : AppCompatActivity() {
             header.addView(img, lpImg)
             val nama = EditText(this)
             nama.hint = "Nama produk (auto AI)"
+            nama.setTextColor(0xFF111111.toInt())
+            nama.setHintTextColor(0xFF667085.toInt())
             nama.setSingleLine(true)
             val lpNama = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -348,11 +350,14 @@ class MainActivity : AppCompatActivity() {
             lpNama.leftMargin = padKecil
             header.addView(nama, lpNama)
             val statusNama = TextView(this)
+            statusNama.setTextColor(0xFF374151.toInt())
             kartu.addView(header, lp(0))
             kartu.addView(statusNama, lp(2))
 
             val harga = EditText(this)
             harga.hint = "Harga (Rp, tanpa titik)"
+            harga.setTextColor(0xFF111111.toInt())
+            harga.setHintTextColor(0xFF667085.toInt())
             harga.inputType = android.text.InputType.TYPE_CLASS_NUMBER
             harga.setSingleLine(true)
             kartu.addView(harga, lp(marginTop))
@@ -363,6 +368,8 @@ class MainActivity : AppCompatActivity() {
             val teksLbl = teksKecil("Cetak label (lembar):  ", 0xFF333333.toInt())
             val labelQty = EditText(this)
             labelQty.hint = "0"
+            labelQty.setTextColor(0xFF111111.toInt())
+            labelQty.setHintTextColor(0xFF667085.toInt())
             labelQty.inputType = android.text.InputType.TYPE_CLASS_NUMBER
             labelQty.setSingleLine(true)
             labelQty.setText("0")
@@ -384,7 +391,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        val dlg = AlertDialog.Builder(this)
+        val dlg = AlertDialog.Builder(this, android.R.style.Theme_Material_Light_Dialog_Alert)
             .setTitle("Tambah ${uris.size} produk dari Foto")
             .setView(scroll)
             .setNegativeButton("Batal", null)
