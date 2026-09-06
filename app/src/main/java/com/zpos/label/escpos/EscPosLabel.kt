@@ -261,6 +261,11 @@ object EscPosLabel {
         else
             (h * 44 / 120).coerceIn(16, (h - yB - 6).coerceAtLeast(16))
         val yBcText = if (bigLabel) barY + barH + 2 else -1
+        // Nama label BESAR (40x30): font TSPL nyata ≈ 13 dot/char (bukan estimasi 4-5 yg lama).
+        // Batas ini diambil dr kasus nyata 40x30 ("Fire Rescue Cartoon Fire" = ~24 char baru muat
+        // 1 baris; nama yg melebihi dibiarkan engine wrap → menimpa baris Harga). Dipotong pasti
+        // ≤ 1 baris + "..." dgn sisa muat aman. Ukuran lain (h<240) tetap namaMaxChar lama.
+        val nbNama = if (bigLabel) ((w - 16) / 13).coerceAtLeast(10) else 0
         // NOTE multi-label (v1.6.11): PER-LABEL job utuh — setiap label = SIZE h + GAP + CLS +
         // isi (TEXT/BARCODE, y TANPA offset, semua dalam kanvas) + PRINT 1,1 + FORFEED <h>.
         //   - per-label SIZE h = kanvas SATU label (aturan TSPL: SIZE = 1 kanvas; zona idx*step
@@ -279,9 +284,9 @@ object EscPosLabel {
                 val (mQ, xQ) = qrGeo(l.bc, w, h, barY)
                 val qrH = (h * 44 / 120).coerceIn(16, (h - barY - 6).coerceAtLeast(16))
                 val bcSan = sanitizeTsp(l.bc)
-                val xN2 = if (bigLabel) centerXTsP(clipTsp(l.nama, namaMaxChar(w, fm)).length, fm, w) else 4
+                val xN2 = if (bigLabel) centerXTsP(clipTsp(l.nama, nbNama).length, fm, w) else 4
                 val xH2 = if (bigLabel) centerXTsP(hRibu.length, fm, w) else 4
-                out.write("TEXT $xN2,$yN,\"1\",0,$fm,$fm,\"${clipTsp(l.nama, namaMaxChar(w, fm))}\"$eol".toByteArray(Charsets.US_ASCII))
+                out.write("TEXT $xN2,$yN,\"1\",0,$fm,$fm,\"${clipTsp(l.nama, if (bigLabel) nbNama else namaMaxChar(w, fm))}\"$eol".toByteArray(Charsets.US_ASCII))
                 val txtH2 = hRibu
                 out.write("TEXT $xH2,$yH,\"1\",0,$fm,$fm,\"$txtH2\"$eol".toByteArray(Charsets.US_ASCII))
                 out.write("BARCODE $xQ,$barY,\"QRCODE\",$qrH,0,0,$mQ,\"$bcSan\"$eol".toByteArray(Charsets.US_ASCII))
@@ -289,10 +294,10 @@ object EscPosLabel {
                 // bigLabel (40x30): geser barcode ke KANAN (habiskan ruang kosong kanan), sisakan marjin kecil.
                 val (bcX, bcN) = if (bigLabel) barcodeGeoBigR(l.bc, w) else barcodeGeo(l.bc, w)
                 // label: nama (1 baris) + harga + barcode — sisanya dihilangkan
-                val xN = if (bigLabel) centerXTsP(clipTsp(l.nama, namaMaxChar(w, fm)).length, fm, w) else 4
+                val xN = if (bigLabel) centerXTsP(clipTsp(l.nama, nbNama).length, fm, w) else 4
                 val hTxt = hRibu
                 val xH = if (bigLabel) centerXTsP(hTxt.length, fm, w) else 4
-                out.write("TEXT $xN,$yN,\"1\",0,$fm,$fm,\"${clipTsp(l.nama, namaMaxChar(w, fm))}\"$eol".toByteArray(Charsets.US_ASCII))
+                out.write("TEXT $xN,$yN,\"1\",0,$fm,$fm,\"${clipTsp(l.nama, if (bigLabel) nbNama else namaMaxChar(w, fm))}\"$eol".toByteArray(Charsets.US_ASCII))
                 out.write("TEXT $xH,$yH,\"1\",0,$fm,$fm,\"$hTxt\"$eol".toByteArray(Charsets.US_ASCII))
                 out.write("BARCODE $bcX,$barY,\"${barcodeKodeTsp(l.bc)}\",$barH,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
                 if (bigLabel) {
