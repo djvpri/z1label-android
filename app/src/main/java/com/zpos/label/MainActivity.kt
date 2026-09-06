@@ -965,7 +965,14 @@ class MainActivity : AppCompatActivity() {
             Logger.log(this, "bt", "pilih printer GAGAL: adapter null (HP tanpa BT)")
             Toast.makeText(this, "Perangkat tak punya Bluetooth", Toast.LENGTH_SHORT).show(); return false
         }
-        val needsConnect = ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+        // Cek izin yg dipakai PER-VERSI SDK: Android 12+ (API31) pakai BLUETOOTH_CONNECT;
+        // Android lama minta & harus cek BLUETOOTH_ADMIN. Bug lama: kebutuhan <31 dgn cek CONNECT
+        // (API31+) TAK pernah granted -> tombol printer tak pernah lanjut ke dialog (kondisi HP
+        // junaidimok2, sdh di-log v1.6.31/1.6.32).
+        val permCek = if (Build.VERSION.SDK_INT >= 31)
+            Manifest.permission.BLUETOOTH_CONNECT
+        else Manifest.permission.BLUETOOTH_ADMIN
+        val needsConnect = ContextCompat.checkSelfPermission(this, permCek) != PackageManager.PERMISSION_GRANTED
         if (needsConnect) {
             Logger.log(this, "bt", "izin BLUETOOTH_CONNECT belum dikabulkan (ask=$ask)")
         }
