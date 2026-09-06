@@ -45,7 +45,7 @@ object EscPosLabel {
         paint.typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
         paint.textSize = sc * 2.2f
         paint.textAlign = Paint.Align.CENTER
-        val namaClipped = clipText(nama, paint, w - (sc * 2))
+        val namaClipped = clipText(nama, paint, w - (sc * 2), ellipsis = true)
         c.drawText(namaClipped, w / 2f, sc * 3f, paint)
 
         // --- harga (tipis, agak besar) ---
@@ -83,7 +83,7 @@ object EscPosLabel {
         paint.typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
         paint.textAlign = Paint.Align.CENTER
         paint.textSize = sc * 2.2f
-        c.drawText(clipText(nama, paint, w - (sc * 2)), w / 2f, sc * 3f, paint)
+        c.drawText(clipText(nama, paint, w - (sc * 2), ellipsis = true), w / 2f, sc * 3f, paint)
         paint.textSize = sc * 3.2f
         val hsl = if (h >= 240) ribuIdn(harga) else harga
         c.drawText(hsl, w / 2f, sc * 7.4f, paint)
@@ -148,9 +148,19 @@ object EscPosLabel {
         }
     }
 
-    private fun clipText(t: String, p: Paint, maxW: Float): String {
+    private fun clipText(t: String, p: Paint, maxW: Float, ellipsis: Boolean = false): String {
         if (p.measureText(t) <= maxW) return t
+        if (!ellipsis) {
+            var s = t
+            while (s.isNotEmpty() && p.measureText(s) > maxW) s = s.dropLast(1)
+            return s.takeIf { it.isNotEmpty() } ?: "."
+        }
+        // NAMA kepanjangan: sisakan tempat utk "..." (1 baris, ujung berpola).
+        val mark = "..."
         var s = t
+        while (s.length > mark.length && p.measureText(s + mark) > maxW) s = s.dropLast(1)
+        if (s.length > mark.length && p.measureText(s + mark) <= maxW) return s + mark
+        // Label amat sempit: drop ke-3-titik pun tak muat → fallback potong polos.
         while (s.isNotEmpty() && p.measureText(s) > maxW) s = s.dropLast(1)
         return s.takeIf { it.isNotEmpty() } ?: "."
     }
@@ -370,10 +380,14 @@ object EscPosLabel {
     /** Buang karakter yg bisa merusak perintah TSPL. */
     private fun sanitizeTsp(s: String): String = s.filter { it in '0'..'9' || it in 'A'..'Z' || it in 'a'..'z' || it == ' ' }
 
-    /** Clip teks agar tak melebihi lebar label (est. per-char utk font multiplier2). */
+    /** Clip teks agar tak melebihi lebar label (est. per-char utk font multiplier2). Kepanjangan
+     *  dipotong 1-baris + disisipi "..." (marker lihat terpotong; TSPL font "1" = ASCII aman). */
     private fun clipTsp(s: String, maxChars: Int): String {
         val clean = sanitizeTsp(s)
-        return if (clean.length > maxChars) clean.take(maxChars - 1) + "." else clean
+        if (clean.length <= maxChars) return clean
+        val mark = "..."
+        return if (maxChars > mark.length) clean.take(maxChars - mark.length) + mark
+        else clean.take(maxChars)
     }
 
     /**
