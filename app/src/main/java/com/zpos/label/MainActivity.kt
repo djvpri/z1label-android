@@ -185,6 +185,8 @@ class MainActivity : AppCompatActivity() {
             b.drawerRoot.openDrawer(GravityCompat.START)
         }
         b.navDrawer.setNavigationItemSelectedListener { item ->
+            val pid = com.zpos.label.R.id.menu_printer
+            Logger.log(this, "bt", "drawer tap id=${item.itemId} printerId=$pid (periksa match di menu layout)")
             when (item.itemId) {
                 com.zpos.label.R.id.menu_printer -> pilihPrinter()
                 com.zpos.label.R.id.menu_kertas -> pilihKertas()
