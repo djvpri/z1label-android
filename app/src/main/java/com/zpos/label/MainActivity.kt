@@ -74,8 +74,9 @@ class MainActivity : AppCompatActivity() {
     private var bcSrc = "6"                  // "6" (barcode_internal label) | "13" (barcode asli)
 
     private val permReq =
-        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { _ ->
-            // cukup coba start; sesudah grant user pilih via bluetooth isEnabled
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
+            val ok = grants.values.all { it }
+            Logger.log(this, "bt", "hasil izin: " + grants.entries.joinToString { "${it.key}=${it.value}" } + " -> totalOk=$ok")
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -429,6 +430,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun pilihPrinter() {
+        Logger.log(this, "bt", "klik pilih printer (scanAktif=$scanAktif)")
         if (!bluetoothOk(true)) return
         tampilDialogPrinter()
     }
@@ -444,11 +446,13 @@ class MainActivity : AppCompatActivity() {
         dlg.setOnDismissListener { if (!scanAktif) BluetoothPrinter.stopScan(applicationContext) }
         printerDialog = dlg
         dlg.show()
+        Logger.log(this, "bt", "dialog pilih printer DITAMPILKAN (show ok)")
     }
 
     private fun isiDialogPrinter(builder: AlertDialog.Builder) {
         val bonded = BluetoothPrinter.pairedDevices()
         val scan = if (scanAktif) BluetoothPrinter.discoveredDevices() else emptyList()
+        Logger.log(this, "bt", "dialog printer: bonded=${bonded.size}, discovery=${scan.size}, scanAktif=$scanAktif")
         val merged = LinkedHashMap<String, BluetoothDevice>()
         (bonded + scan).forEach { merged[it.address] = it }
         val list = merged.values.toList()
@@ -620,9 +624,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun bluetoothOk(ask: Boolean): Boolean {
         val adapter = BluetoothAdapter.getDefaultAdapter() ?: run {
+            Logger.log(this, "bt", "pilih printer GAGAL: adapter null (HP tanpa BT)")
             Toast.makeText(this, "Perangkat tak punya Bluetooth", Toast.LENGTH_SHORT).show(); return false
         }
         val needsConnect = ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+        if (needsConnect) {
+            Logger.log(this, "bt", "izin BLUETOOTH_CONNECT belum dikabulkan (ask=$ask)")
+        }
         if (needsConnect && ask) {
             val perms = if (Build.VERSION.SDK_INT >= 31)
                 arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN)
@@ -630,9 +638,13 @@ class MainActivity : AppCompatActivity() {
             permReq.launch(perms)
             return false
         }
-        if (!adapter.isEnabled && ask) {
-            startActivityForResult(android.content.Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), 1)
+        if (!adapter.isEnabled) {
+            Logger.log(this, "bt", "Bluetooth mati/off (ask=$ask)")
+            if (ask) startActivityForResult(android.content.Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), 1)
+            else Logger.log(this, "bt", "bluetooth off & !ask -> bluetoothOk=false")
+            if (!ask) return false
         }
+        if (!needsConnect || !ask) Logger.log(this, "bt", "bluetooth ok -> buka dialog printer")
         return true
     }
 
