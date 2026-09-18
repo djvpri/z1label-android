@@ -41,6 +41,10 @@ app/src/main/java/com/zpos/label/
 
 ## Rilis (untuk agent & manusia)
 
+> **Agent:** prosedur lengkap ada di
+> [`Z-Rooms-android/RILIS-AGENT.md`](https://github.com/djvpri/Z-Rooms-android/blob/main/RILIS-AGENT.md)
+> — mencakup Z1 Label juga. Ringkasnya di bawah.
+
 Rilis lewat GitHub Actions: **`.github/workflows/release.yml`**.
 
 | Jalur | Butuh | Untuk siapa |
