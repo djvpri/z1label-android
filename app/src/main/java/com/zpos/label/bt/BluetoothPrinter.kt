@@ -142,9 +142,15 @@ object BluetoothPrinter {
         if (address.isNullOrBlank()) { onResult?.invoke("alamat printer kosong"); return }
         Thread {
             if (connected()) { notifyConnected(true); onResult?.invoke(null); return@Thread }
-            val err = connect(address)
+            // ponytail: retry 3x delay 1.5s — BT adapter butuh waktu stabil setelah dinyalakan.
+            // Upgrade: listen STATE_ON broadcast utk connect segera tanpa polling.
+            var err: String? = null
+            for (i in 1..3) {
+                if (i > 1) Thread.sleep(1500)
+                err = connect(address)
+                if (err == null) break
+            }
             if (err != null) {
-                // tetap kabari UI walau guard notifiedConnected false: user perlu tahu BELUM sambung
                 onStateChange?.let { runCatching { it(false) } }
             }
             onResult?.invoke(err)

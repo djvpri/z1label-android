@@ -107,6 +107,20 @@ class MainActivity : AppCompatActivity() {
             // else: batal/tak pilih -> diam
         }
 
+    // BT enable launcher: ganti deprecated startActivityForResult(requestCode=1).
+    // Saat user nyalakan BT, auto-connect retry otomatis.
+    private val btEnableLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+            if (r.resultCode == Activity.RESULT_OK) {
+                Logger.log(this, "bt", "BT dinyalakan user -> auto-connect retry")
+                // BT adapter butuh ~1.5s stabil sebelum connect
+                Thread { Thread.sleep(1500); runOnUiThread { autoSambungPrinter() } }.start()
+            } else {
+                Logger.log(this, "bt", "BT enable ditolak user")
+                b.lblStatus.text = "Bluetooth mati — nyalakan utk cetak"
+            }
+        }
+
     // Fallback <33: ACTION_OPEN_DOCUMENT dengan EXTRA_ALLOW_MULTIPLE.
     private val galeriDocLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
@@ -604,7 +618,11 @@ class MainActivity : AppCompatActivity() {
     private fun autoSambungPrinter() {
         val addr = prefs.getString("printer", null) ?: return
         if (BluetoothPrinter.connected()) { b.lblStatus.text = "Printer terhubung"; Logger.log(this, "bt", "sudah terhubung $addr"); return }
-        if (!bluetoothOk(ask = true)) return   // minta izin BT dulu
+        if (!bluetoothOk(ask = true)) {
+            // BT mati: bluetoothOk sudah fire enable dialog. auto-connect retry via btEnableLauncher callback.
+            Logger.log(this, "bt", "auto-connect pending: BT mati, tunggu user nyalakan")
+            return
+        }
         b.lblStatus.text = "Menghubungkan printer…"
         Logger.log(this, "bt", "auto-connect $addr")
         BluetoothPrinter.autoConnect(addr) { err ->
@@ -985,9 +1003,9 @@ class MainActivity : AppCompatActivity() {
         }
         if (!adapter.isEnabled) {
             Logger.log(this, "bt", "Bluetooth mati/off (ask=$ask)")
-            if (ask) startActivityForResult(android.content.Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), 1)
+            if (ask) btEnableLauncher.launch(android.content.Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
             else Logger.log(this, "bt", "bluetooth off & !ask -> bluetoothOk=false")
-            if (!ask) return false
+            return false   // kunci: BT masih mati, jangan lanjut connect
         }
         if (!needsConnect || !ask) Logger.log(this, "bt", "bluetooth ok -> buka dialog printer")
         return true
