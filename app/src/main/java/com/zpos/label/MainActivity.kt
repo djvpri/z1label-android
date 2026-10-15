@@ -78,6 +78,7 @@ class MainActivity : AppCompatActivity() {
     private var paperH = 15
     private var proto = "tspl"              // "tspl" (printer label clabel/... ) | "esc"
     private var fontMul = 1                  // 1|2|3 => S/M/L utk TEXT nama & harga label (seragam)
+    private var namaToko = ""               // nama toko aktif (dari login / API)
     private var barcodeMode = "1d"           // "1d" (EAN-13/Code128) | "2d" (QR)
     private var bcSrc = "6"                  // "6" (barcode_internal label) | "13" (barcode asli)
 
@@ -147,6 +148,7 @@ class MainActivity : AppCompatActivity() {
         fontMul = prefs.getInt("fontMul", 1)
         barcodeMode = prefs.getString("barcodeMode", "1d") ?: "1d"
         bcSrc = prefs.getString("bcSrc", "6") ?: "6"
+        namaToko = prefs.getString("nama_toko", "") ?: ""
         b.btnFont.text = "Font: " + fontLabel(fontMul)
         b.btnBarcode.text = barcodeBtnLabel()
         b.btnBcSrc.text = bcSrcBtnLabel()
@@ -721,6 +723,19 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     Logger.log(this@MainActivity, "login", "sukses $email")
                     prefs.edit().putString("email", email).putString("sandi", sandi).apply()
+                    // Nama toko dari login response; fallback /api/auth/me
+                    namaToko = ZposApi.namaToko.ifBlank { email }
+                    if (ZposApi.namaToko.isBlank()) {
+                        scope.launch {
+                            val profil = ZposApi.ambilProfil()
+                            if (profil.isNotBlank()) {
+                                namaToko = profil
+                                prefs.edit().putString("nama_toko", namaToko).apply()
+                                withContext(Dispatchers.Main) { updateTokoLabel() }
+                            }
+                        }
+                    }
+                    prefs.edit().putString("nama_toko", namaToko).apply()
                     b.lblLogin.text = ""
                     showMain()
                 }
@@ -960,9 +975,20 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
+    /** Update top bar + drawer header dgn nama toko aktif. */
+    private fun updateTokoLabel() {
+        val display = namaToko.ifBlank { "Produk" }
+        b.txtTokoName.text = display
+        // Drawer header: akses manual (headerLayout tak ter-bind di ActivityMainBinding)
+        val header = b.navDrawer.getHeaderView(0)
+        header?.findViewById<android.widget.TextView>(com.zpos.label.R.id.txtDrawerToko)?.text =
+            namaToko.ifBlank { "Z1 Label" }
+    }
+
     private fun setPrinterLabel() {
         b.btnProto.text = btnProtoLabel()
         b.btnPrinter.text = "Printer: " + (printerAddress?.take(6)?.let { "…$it" } ?: "belum pilih")
+        updateTokoLabel()
         // Printer chip di top bar
         val connected = BluetoothPrinter.connected()
         val chipName = printerAddress?.take(8)?.let { "…$it" } ?: "Pilih"

@@ -38,8 +38,10 @@ object ZposApi {
 
     @Volatile var baseUrl: String = "https://z1pos.zomet.my.id"
     @Volatile var cookie: String = ""
+    @Volatile var namaToko: String = ""
 
-    /** Login pakai email+sandi z1pos (POST /api/auth/login, set cookie zpos_token). */
+    /** Login pakai email+sandi z1pos (POST /api/auth/login, set cookie zpos_token).
+     *  Juga baca body response utk nama toko (multi-tenant). */
     fun login(email: String, sandi: String): String? {
         val body = "{\"email\":${JSONObject.quote(email)},\"password\":${JSONObject.quote(sandi)}}"
         val conn = URL("$baseUrl/api/auth/login").openConnection() as HttpURLConnection
@@ -52,14 +54,64 @@ object ZposApi {
             conn.outputStream.use { it.write(body.toByteArray()) }
             val code = conn.responseCode
             val set = conn.headerFields?.get("set-cookie") ?: emptyList()
+            var gotCookie = false
             for (h in set) {
                 h.split(";").forEach { p ->
                     val kv = p.trim().split("=", limit = 2)
-                    if (kv.size == 2 && kv[0] == "zpos_token") { cookie = kv[1]; return null }
+                    if (kv.size == 2 && kv[0] == "zpos_token") { cookie = kv[1]; gotCookie = true }
                 }
             }
+            // Baca body sukses utk nama toko
+            if (gotCookie && code in 200..299) {
+                val respBody = conn.inputStream?.bufferedReader()?.use { it.readText() } ?: ""
+                namaToko = parseNamaToko(respBody, email)
+            }
+            if (gotCookie) return null
             return conn.errorStream?.let { String(it.readBytes()) } ?: "Login gagal ($code)"
         } finally { conn.disconnect() }
+    }
+
+    /** Ambil nama toko dari berbagai kemungkinan field di JSON response login. */
+    private fun parseNamaToko(body: String, email: String): String {
+        if (body.isBlank()) return email
+        return try {
+            val o = JSONObject(body)
+            // Coba berbagai field yg mungkin ada di response ZPos
+            listOf("nama_toko", "toko", "store_name", "store", "toko_nama", "nama")
+                .firstNotNullOfOrNull { key ->
+                    o.optString(key).takeIf { it.isNotBlank() && it != "null" }
+                }
+                // Nested: user.nama_toko, user.toko, dst
+                ?: listOf("user", "toko", "store")
+                    .firstNotNullOfOrNull { parent ->
+                        o.optJSONObject(parent)?.let { sub ->
+                            listOf("nama", "nama_toko", "toko", "store_name")
+                                .firstNotNullOfOrNull { key ->
+                                    sub.optString(key).takeIf { it.isNotBlank() && it != "null" }
+                                }
+                        }
+                    }
+                ?: email
+        } catch (_: Exception) { email }
+    }
+
+    /** GET /api/auth/me — fallback utk nama toko bila login response tak punya. */
+    fun ambilProfil(): String {
+        if (cookie.isEmpty()) return ""
+        return try {
+            val conn = open("$baseUrl/api/auth/me", null)
+            try {
+                if (conn.responseCode != 200) return ""
+                val txt = conn.inputStream.bufferedReader().use { it.readText() }
+                if (txt.isBlank() || txt == "null") return ""
+                val o = JSONObject(txt)
+                listOf("nama_toko", "toko", "store_name", "store", "nama")
+                    .firstNotNullOfOrNull { key ->
+                        o.optString(key).takeIf { it.isNotBlank() && it != "null" }
+                    }
+                    ?: ""
+            } finally { conn.disconnect() }
+        } catch (_: Exception) { "" }
     }
 
     /** Ambil semua produk aktif toko. */
