@@ -2,4 +2,23 @@
 <resources>
     <color name="teal_700">#00897B</color>
     <color name="teal_200">#80CBC4</color>
+
+    <!-- M3 Clean palette -->
+    <color name="z1_primary">#006A6A</color>
+    <color name="z1_primary_dark">#004D4D</color>
+    <color name="z1_on_primary">#FFFFFF</color>
+    <color name="z1_surface">#FDFBFF</color>
+    <color name="z1_on_surface">#1A1A1A</color>
+    <color name="z1_on_surface_variant">#666666</color>
+    <color name="z1_outline">#ECECF1</color>
+    <color name="z1_banner_bg">#E0F2F1</color>
+    <color name="z1_banner_border">#B2DFDB</color>
+    <color name="z1_banner_text">#004D4D</color>
+    <color name="z1_banner_disconnected_bg">#FFF3E0</color>
+    <color name="z1_banner_disconnected_border">#FFE0B2</color>
+    <color name="z1_banner_disconnected_text">#E65100</color>
+    <color name="z1_barcode_tag_bg">#F0F0F3</color>
+    <color name="z1_barcode_tag_text">#555555</color>
+    <color name="z1_item_checked_bg">#E0F2F1</color>
+    <color name="z1_chip_bg">#26FFFFFF</color>
 </resources>

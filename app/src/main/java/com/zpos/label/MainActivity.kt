@@ -170,6 +170,7 @@ class MainActivity : AppCompatActivity() {
             if (id in selected) selected.remove(id) else selected.add(id)
             adapter.updateSelected(selected)
             b.btnCetak.isEnabled = selected.isNotEmpty()
+            b.btnCetak.text = if (selected.isNotEmpty()) "🖨️ Cetak (${selected.size} dipilih)" else "🖨️ Cetak"
         }
         b.listProduk.layoutManager = LinearLayoutManager(this)
         b.listProduk.adapter = adapter
@@ -191,6 +192,7 @@ class MainActivity : AppCompatActivity() {
         b.btnBcSrc.setOnClickListener { toggleBcSrc() }
         b.btnCetak.setOnClickListener { cetak() }
         b.btnTambah.setOnClickListener { pilihMetodeTambah() }
+        b.fabTambah.setOnClickListener { pilihMetodeTambah() }
         b.btnCekUpdate.setOnClickListener { cekUpdate(otomatis = false) }
         b.btnKirimLog.setOnClickListener { kirimLog() }
 
@@ -231,11 +233,13 @@ class MainActivity : AppCompatActivity() {
     private fun showLogin() {
         b.loginView.visibility = View.VISIBLE
         b.mainView.visibility = View.GONE
+        b.fabTambah.visibility = View.GONE
     }
 
     private fun showMain() {
         b.loginView.visibility = View.GONE
         b.mainView.visibility = View.VISIBLE
+        b.fabTambah.visibility = View.VISIBLE
         loadProduk()
         cekUpdate(otomatis = true)
         // auto-connect printer tersimpan (konsep GPrinter: buka app = langsung terhubung)
@@ -246,6 +250,15 @@ class MainActivity : AppCompatActivity() {
     private fun parseHargaUang(t: String): Long {
         val digits = t.filter { it.isDigit() }
         return digits.toLongOrNull() ?: 0L
+    }
+
+    companion object {
+        /** Format string harga mentah → "18.500" (titik ribuan). */
+        fun formatRupiahS(harga: String): String {
+            val digits = harga.filter { it.isDigit() }
+            val n = digits.toLongOrNull() ?: 0L
+            return "%,d".format(n).replace(',', '.')
+        }
     }
 
     // ===================== Tambah produk via FOTO (v1.6.26) =====================
@@ -727,6 +740,7 @@ class MainActivity : AppCompatActivity() {
                     Logger.log(this@MainActivity, "load", "produk=${list.size}, nama-kosong=$kosong")
                     filterList(b.txtCari.text.toString())
                     b.btnCetak.isEnabled = false
+                    b.btnCetak.text = "🖨️ Cetak"
                     b.lblStatus.text = "${semua.size} produk"
                     afterSukses?.invoke()
                 }.onFailure { e ->
@@ -949,6 +963,30 @@ class MainActivity : AppCompatActivity() {
     private fun setPrinterLabel() {
         b.btnProto.text = btnProtoLabel()
         b.btnPrinter.text = "Printer: " + (printerAddress?.take(6)?.let { "…$it" } ?: "belum pilih")
+        // Printer chip di top bar
+        val connected = BluetoothPrinter.connected()
+        val chipName = printerAddress?.take(8)?.let { "…$it" } ?: "Pilih"
+        b.printerChipName.text = chipName
+        b.printerDot.setBackgroundResource(
+            if (connected) com.zpos.label.R.drawable.printer_dot_on
+            else com.zpos.label.R.drawable.printer_dot_off
+        )
+        // Printer banner
+        if (printerAddress == null) {
+            b.printerBanner.setBackgroundResource(com.zpos.label.R.color.z1_banner_disconnected_bg)
+            b.printerBannerText.text = "Printer belum dipilih — ketuk untuk pilih"
+            b.printerBannerText.setTextColor(getColor(com.zpos.label.R.color.z1_banner_disconnected_text))
+        } else if (connected) {
+            b.printerBanner.setBackgroundResource(com.zpos.label.R.color.z1_banner_bg)
+            b.printerBannerText.text = "Printer terhubung — siap cetak"
+            b.printerBannerText.setTextColor(getColor(com.zpos.label.R.color.z1_banner_text))
+        } else {
+            b.printerBanner.setBackgroundResource(com.zpos.label.R.color.z1_banner_disconnected_bg)
+            b.printerBannerText.text = "Printer terputus — cetak untuk sambung ulang"
+            b.printerBannerText.setTextColor(getColor(com.zpos.label.R.color.z1_banner_disconnected_text))
+        }
+        b.printerChip.setOnClickListener { pilihPrinter() }
+        b.printerBanner.setOnClickListener { pilihPrinter() }
         BluetoothPrinter.onStateChange = { ok ->
             runOnUiThread {
                 if (ok) Logger.log(this, "bt", "terhubung")
@@ -1189,6 +1227,17 @@ class MainActivity : AppCompatActivity() {
             val nm = p.nama.trim()
             if (nm.isEmpty()) Logger.log(h.itemView.context, "produk", "nama-kosong id=${p.id} (idx=$pos)")
             h.r.txtNama.text = nm.ifEmpty { "Produk #${if (p.id > 0) p.id else pos + 1}" }
+            // Harga + barcode di bawah nama
+            val hargaStr = p.harga.trim()
+            h.r.txtHarga.text = if (hargaStr.isNotEmpty()) "Rp ${formatRupiahS(hargaStr)}" else ""
+            val bc = barcodeLabel(p)
+            h.r.txtBarcode.text = bc
+            // Highlight item terpilih
+            val ctx = h.itemView.context
+            h.itemView.setBackgroundColor(
+                if (p.id in selected) ctx.getColor(com.zpos.label.R.color.z1_item_checked_bg)
+                else ctx.getColor(android.R.color.transparent)
+            )
             h.itemView.setOnClickListener { onToggle(p.id) }
         }
     }

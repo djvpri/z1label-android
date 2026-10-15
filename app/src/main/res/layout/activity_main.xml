@@ -26,7 +26,7 @@
                 android:text="Z1 Label"
                 android:textSize="28sp"
                 android:textStyle="bold"
-                android:textColor="#111" />
+                android:textColor="@color/z1_primary" />
 
             <EditText
                 android:id="@+id/txtEmail"
@@ -78,45 +78,166 @@
             android:orientation="vertical"
             android:visibility="gone">
 
-            <!-- Toolbar tipis: menu + cari + tambah -->
+            <!-- Top App Bar (teal) -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:orientation="horizontal">
+                android:background="@color/z1_primary"
+                android:orientation="vertical">
 
-                <Button
-                    style="@style/BtnRun"
-                    android:id="@+id/btnMenu"
-                    android:layout_width="wrap_content"
+                <!-- Row: menu + title + printer chip -->
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
-                    android:minWidth="54dp"
-                    android:text="☰"
-                    android:textSize="18sp" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="4dp"
+                    android:paddingVertical="4dp">
 
-                <EditText
-                    android:id="@+id/txtCari"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginStart="6dp"
-                    android:hint="Cari produk / barcode..."
-                    android:inputType="text" />
+                    <Button
+                        android:id="@+id/btnMenu"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:text="☰"
+                        android:textColor="@color/z1_on_primary"
+                        android:textSize="22sp"
+                        android:minWidth="0dp"
+                        android:padding="0dp" />
 
-                <Button
-                    style="@style/BtnRun"
-                    android:id="@+id/btnTambah"
-                    android:layout_width="wrap_content"
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="4dp"
+                        android:text="Produk"
+                        android:textColor="@color/z1_on_primary"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
+
+                    <!-- Printer chip -->
+                    <LinearLayout
+                        android:id="@+id/printerChip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:background="@drawable/printer_chip_bg"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="6dp">
+
+                        <View
+                            android:id="@+id/printerDot"
+                            android:layout_width="8dp"
+                            android:layout_height="8dp"
+                            android:background="@drawable/printer_dot_on" />
+
+                        <TextView
+                            android:id="@+id/printerChipName"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="6dp"
+                            android:text="—"
+                            android:textColor="@color/z1_on_primary"
+                            android:textSize="12sp"
+                            android:textStyle="bold"
+                            android:maxLines="1"
+                            android:ellipsize="end"
+                            android:maxWidth="140dp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Search bar -->
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="6dp"
-                    android:layout_marginEnd="4dp"
-                    android:minWidth="86dp"
-                    android:text="＋ Tambah" />
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginHorizontal="16dp"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginBottom="12dp"
+                    android:background="@drawable/search_bg"
+                    android:paddingHorizontal="18dp"
+                    android:paddingVertical="12dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="🔍"
+                        android:textSize="16sp" />
+
+                    <EditText
+                        android:id="@+id/txtCari"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="10dp"
+                        android:hint="Cari produk / barcode..."
+                        android:inputType="text"
+                        android:background="@android:color/transparent"
+                        android:textSize="15sp"
+                        android:imeOptions="actionSearch" />
+                </LinearLayout>
             </LinearLayout>
 
-            <!-- Tersier lama disembunyikan dr toolbar (dipindah ke sidebar); id dipertahankan utk aksi &
-                 pengaturan label pada tombol tsb. -->
+            <!-- Printer status banner -->
+            <LinearLayout
+                android:id="@+id/printerBanner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@color/z1_banner_bg"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="8dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🖨️"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/printerBannerText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="Printer belum dipilih"
+                    android:textColor="@color/z1_banner_text"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <!-- Product list + FAB overlay -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/listProduk"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@color/z1_surface"
+                    android:paddingHorizontal="4dp"
+                    android:paddingVertical="4dp"
+                    android:clipToPadding="false" />
+
+                <!-- FAB Tambah -->
+                <com.google.android.material.floatingactionbutton.FloatingActionButton
+                    android:id="@+id/fabTambah"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:src="@android:drawable/ic_input_add"
+                    app:backgroundTint="@color/z1_primary"
+                    app:tint="@color/z1_on_primary"
+                    android:contentDescription="Tambah Produk"
+                    android:layout_gravity="end|bottom"
+                    android:layout_marginEnd="20dp"
+                    android:layout_marginBottom="20dp"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+            <!-- Hidden buttons — IDs dipertahankan untuk ActivityMainBinding -->
             <Button
                 style="@style/BtnRun"
                 android:id="@+id/btnSort"
@@ -131,14 +252,6 @@
                 android:layout_height="wrap_content"
                 android:visibility="gone"
                 android:text="Kertas" />
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/listProduk"
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1"
-                android:paddingVertical="4dp" />
-
             <Button
                 style="@style/BtnRun"
                 android:id="@+id/btnPrinter"
@@ -146,12 +259,11 @@
                 android:layout_height="wrap_content"
                 android:visibility="gone"
                 android:text="Pilih Printer Bluetooth..." />
-
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:visibility="gone" >
+                android:visibility="gone">
                 <Button
                     style="@style/BtnRun"
                     android:id="@+id/btnProto"
@@ -192,29 +304,56 @@
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- Aksi penting (Cetak + muat + keluar sistem) tetap di bagian bawah utama -->
-            <Button
-                style="@style/BtnRun"
-                android:id="@+id/btnCetak"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginHorizontal="8dp"
-                android:text="Cetak"
-                android:enabled="false" />
-
+            <!-- Bottom action bar: Muat + Cetak -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="8dp"
-                android:layout_marginTop="6dp"
-                android:orientation="horizontal">
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@color/z1_surface"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="12dp">
+
                 <Button
-                    style="@style/BtnRun"
                     android:id="@+id/btnRefresh"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="↻ Muat"
+                    android:textColor="@color/z1_primary"
+                    android:background="?attr/selectableItemBackground"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:minWidth="0dp"
+                    android:paddingHorizontal="16dp" />
+
+                <Button
+                    android:id="@+id/btnCetak"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Muat Ulang" />
+                    android:layout_marginStart="8dp"
+                    android:text="🖨️ Cetak"
+                    android:textColor="@color/z1_on_primary"
+                    android:background="@drawable/btn_cetak_bg"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:enabled="false"
+                    android:minHeight="48dp" />
+            </LinearLayout>
+
+            <!-- Hidden system buttons — IDs dipertahankan, aksi via drawer -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:visibility="gone">
+                <Button
+                    style="@style/BtnRun"
+                    android:id="@+id/btnTambah"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="＋ Tambah" />
                 <Button
                     style="@style/BtnRun"
                     android:id="@+id/btnLogout"
@@ -245,20 +384,23 @@
                 android:id="@+id/lblStatus"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:paddingHorizontal="8dp"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="4dp"
                 android:text=""
-                android:textSize="13sp" />
+                android:textSize="13sp"
+                android:textColor="@color/z1_on_surface_variant"
+                android:background="@color/z1_surface" />
 
             <TextView
                 android:id="@+id/txtVersion"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:paddingHorizontal="8dp"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="2dp"
                 android:text="Z1 Label"
                 android:textSize="11sp"
-                android:textColor="#888" />
+                android:textColor="#888"
+                android:background="@color/z1_surface" />
         </LinearLayout>
     </LinearLayout>
 
