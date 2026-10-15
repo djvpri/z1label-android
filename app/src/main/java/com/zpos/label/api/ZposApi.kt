@@ -114,6 +114,75 @@ object ZposApi {
         } catch (_: Exception) { "" }
     }
 
+    /** Cari produk berdasarkan barcode di DB ZPos sendiri.
+     *  Return: null = tidak ketemu; non-null = sudah terdaftar (duplikat). */
+    fun cekBarcodeDb(barcode: String): Produk? {
+        if (cookie.isEmpty() || barcode.isBlank()) return null
+        return try {
+            val conn = open("$baseUrl/api/produk?semua=1&barcode=${java.net.URLEncoder.encode(barcode, "UTF-8")}", null)
+            try {
+                if (conn.responseCode != 200) return null
+                val txt = conn.inputStream.bufferedReader().use { it.readText() }
+                val arr = JSONArray(txt)
+                for (i in 0 until arr.length()) {
+                    val o = arr.getJSONObject(i)
+                    val bc = o.optString("barcode").takeIf { it.isNotEmpty() }
+                    val bci = o.optString("barcode_internal").takeIf { it.isNotEmpty() }
+                    if (bc == barcode || bci == barcode) {
+                        return Produk(
+                            id = o.optLong("id"),
+                            nama = o.optString("nama").ifBlank { "Produk #${o.optLong("id")}" },
+                            barcode = bc, barcodeInternal = bci,
+                            harga = formatHarga(o.optString("harga")),
+                            satuan = o.optString("satuan").takeIf { it.isNotEmpty() }
+                        )
+                    }
+                }
+                null
+            } finally { conn.disconnect() }
+        } catch (_: Exception) { null }
+    }
+
+    /** Lookup barcode di OpenFood Facts (gratis, no API key).
+     *  Return: nama produk bila ketemu, null bila tidak. */
+    fun lookupOpenFoodFacts(barcode: String): String? {
+        if (barcode.length < 8) return null
+        return try {
+            val conn = URL("https://world.openfoodfacts.org/api/v2/product/$barcode.json?fields=product_name")
+                .openConnection() as HttpURLConnection
+            conn.connectTimeout = 10000
+            conn.readTimeout = 10000
+            conn.setRequestProperty("User-Agent", "Z1Label-Android/1.7")
+            try {
+                if (conn.responseCode != 200) return null
+                val txt = conn.inputStream.bufferedReader().use { it.readText() }
+                val o = JSONObject(txt)
+                if (o.optInt("status") == 1) {
+                    o.optJSONObject("product")?.optString("product_name")?.takeIf { it.isNotBlank() }
+                } else null
+            } finally { conn.disconnect() }
+        } catch (_: Exception) { null }
+    }
+
+    /** Hasil lookup barcode: source + nama (bila ketemu). */
+    data class BarcodeLookup(
+        val source: String,   // "db" | "off" | "notfound"
+        val nama: String?,    // nama produk bila ketemu
+        val produkId: Long?   // ID bila sudah ada di DB
+    )
+
+    /** Lookup barcode berurutan: DB ZPos → OpenFood Facts → tidak ketemu. */
+    fun lookupBarcode(barcode: String): BarcodeLookup {
+        // 1. Cek DB sendiri
+        val existing = cekBarcodeDb(barcode)
+        if (existing != null) return BarcodeLookup("db", existing.nama, existing.id)
+        // 2. OpenFood Facts
+        val offName = lookupOpenFoodFacts(barcode)
+        if (offName != null) return BarcodeLookup("off", offName, null)
+        // 3. Tidak ketemu
+        return BarcodeLookup("notfound", null, null)
+    }
+
     /** Ambil semua produk aktif toko. */
     fun daftarProduk(): Result<List<Produk>> {
         if (cookie.isEmpty()) return Result.failure(IllegalStateException("Belum login"))
@@ -174,16 +243,18 @@ object ZposApi {
         } catch (e: Exception) { Result.failure(e) }
     }
 
-    /** Simpan produk baru ke server (tenant toko aktif). Stok awal = 20 dr app label. */
-    fun simpanProduk(nama: String, harga: Double, kategoriId: Long): Result<Long?> {
+    /** Simpan produk baru ke server (tenant toko aktif). Stok awal = 20 dr app label.
+     *  @param barcode barcode asli produk (EAN-13/Code128) — opsional, dikirim bila ada. */
+    fun simpanProduk(nama: String, harga: Double, kategoriId: Long, barcode: String? = null): Result<Long?> {
         if (cookie.isEmpty()) return Result.failure(IllegalStateException("Belum login"))
         return try {
-            val body = JSONObject()
+            val json = JSONObject()
                 .put("nama", nama)
                 .put("harga", harga)      // server: z.number().positive
                 .put("stok", 20)          // server default 0; app label simpan otomatis 20
                 .put("kategori_id", kategoriId)   // WAJIB: tanpa ini zod server tolak validasi
-                .toString().toByteArray(Charsets.UTF_8)
+            if (!barcode.isNullOrBlank()) json.put("barcode", barcode)
+            val body = json.toString().toByteArray(Charsets.UTF_8)
             val conn = URL("$baseUrl/api/produk").openConnection() as HttpURLConnection
             conn.connectTimeout = 15000
             conn.readTimeout = 30000

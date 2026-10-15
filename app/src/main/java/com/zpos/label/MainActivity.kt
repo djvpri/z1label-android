@@ -135,6 +135,13 @@ class MainActivity : AppCompatActivity() {
             if (uris.distinct().size > 0) bukaTambahFoto(uris.distinct())
         }
 
+    // Barcode scanner launcher (ZXing Android Embedded 4.3+ via ScanContract).
+    private val barcodeScanLauncher =
+        registerForActivityResult(com.journeyapps.barcodescanner.ScanContract()) { result ->
+            val contents = result.contents
+            if (!contents.isNullOrBlank()) bukaDialogBarcode(contents)
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         CrashReport.install(applicationContext)   // tangkap crash sebelum app keluar
@@ -269,15 +276,36 @@ class MainActivity : AppCompatActivity() {
     // Harga tetap manual. "Berapa lembar label" utk produk yg mau langsung dicetak.
 
     private fun pilihMetodeTambah() {
-        val opts = arrayOf("🖊  Tambah Manual (ketik nama)", "📷  Tambah dari Foto (auto nama AI)")
+        val opts = arrayOf("🖊  Tambah Manual (ketik nama)", "📊  Scan Barcode (auto nama)", "📷  Tambah dari Foto (auto nama AI)")
         AlertDialog.Builder(this, android.R.style.Theme_Material_Light_Dialog_Alert)
             .setTitle("Tambah Produk")
             .setItems(opts) { _, i ->
-                if (i == 0) bukaDialogTambah()
-                else pilihFotoUtkProduk()
+                when (i) {
+                    0 -> bukaDialogTambah()
+                    1 -> mulaiScanBarcode()
+                    else -> pilihFotoUtkProduk()
+                }
             }
             .setNegativeButton("Batal", null)
             .show()
+    }
+
+    /** Launch ZXing barcode scanner via ScanContract. */
+    private fun mulaiScanBarcode() {
+        val opts = com.journeyapps.barcodescanner.ScanOptions().apply {
+            setOrientationLocked(false)
+            setPrompt("Arahkan kamera ke barcode produk")
+            setBeepEnabled(true)
+            setBarcodeImageEnabled(false)
+            setDesiredBarcodeFormats(
+                com.journeyapps.barcodescanner.ScanOptions.EAN_13,
+                com.journeyapps.barcodescanner.ScanOptions.EAN_8,
+                com.journeyapps.barcodescanner.ScanOptions.UPC_A,
+                com.journeyapps.barcodescanner.ScanOptions.CODE_128,
+                com.journeyapps.barcodescanner.ScanOptions.QR_CODE
+            )
+        }
+        barcodeScanLauncher.launch(opts)
     }
 
     /** Buka pemilih galeri multi gambar (internal tab: photo picker API 33+, fallback ACTION_OPEN_DOCUMENT). */
@@ -702,6 +730,187 @@ class MainActivity : AppCompatActivity() {
                     }
                     .setNegativeButton("Nanti", null)
                     .show()
+            }
+        }
+    }
+
+    // ===================== Tambah produk via BARCODE =====================
+    // Scan barcode → cek DB ZPos (duplikat?) → OpenFood Facts (auto nama) → manual.
+    // Harga selalu manual. Barcode tersimpan ke server via simpanProduk(barcode=...).
+
+    /** Buka dialog tambah produk dari hasil scan barcode.
+     *  @param scannedCode barcode hasil scan ZXing (atau input manual). */
+    private fun bukaDialogBarcode(scannedCode: String) {
+        val density = resources.displayMetrics.density
+        val pad = (18 * density).toInt()
+        val marginTop = (10 * density).toInt()
+
+        // Barcode display (read-only)
+        val txtBarcode = TextView(this).apply {
+            text = "Barcode: $scannedCode"
+            textSize = 13f
+            setTextColor(0xFF666666.toInt())
+            typeface = android.graphics.Typeface.MONOSPACE
+        }
+
+        // Status lookup
+        val txtStatus = TextView(this).apply {
+            text = "Mencari produk..."
+            textSize = 13f
+            setTextColor(0xFF888888.toInt())
+            setPadding(0, marginTop, 0, 0)
+        }
+
+        // Nama (editable)
+        val txtNama = EditText(this).apply {
+            hint = "Nama produk"
+            setTextColor(0xFF111111.toInt())
+            setHintTextColor(0xFF667085.toInt())
+            setSingleLine(true)
+        }
+
+        // Harga
+        val txtHarga = EditText(this).apply {
+            hint = "Harga (Rp, tanpa titik)"
+            setTextColor(0xFF111111.toInt())
+            setHintTextColor(0xFF667085.toInt())
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setSingleLine(true)
+        }
+
+        // Qty label
+        val txtQtyLabel = TextView(this).apply {
+            text = "Cetak label langsung (lembar): 0"
+            textSize = 12f
+            setTextColor(0xFF888888.toInt())
+            setPadding(0, marginTop, 0, 0)
+        }
+        var labelQty = 0
+        val btnQtyMinus = android.widget.Button(this).apply {
+            text = "−"
+            setOnClickListener { if (labelQty > 0) { labelQty--; txtQtyLabel.text = "Cetak label langsung (lembar): $labelQty" } }
+        }
+        val btnQtyPlus = android.widget.Button(this).apply {
+            text = "＋"
+            setOnClickListener { labelQty++; txtQtyLabel.text = "Cetak label langsung (lembar): $labelQty" }
+        }
+        val qtyRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            addView(txtQtyLabel, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            addView(btnQtyMinus)
+            addView(btnQtyPlus)
+        }
+
+        val col = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(pad, 0, pad, 0)
+        }
+        fun lpW(mTop: Int) = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = mTop }
+
+        col.addView(txtBarcode, lpW(0))
+        col.addView(txtStatus)
+        col.addView(txtNama, lpW(marginTop))
+        col.addView(txtHarga, lpW(marginTop))
+        col.addView(qtyRow, lpW(marginTop))
+
+        val dialog = AlertDialog.Builder(this, android.R.style.Theme_Material_Light_Dialog_Alert)
+            .setTitle("Tambah dari Barcode")
+            .setView(col)
+            .setNegativeButton("Batal", null)
+            .setPositiveButton("Simpan", null)
+            .create()
+
+        dialog.setOnShowListener {
+            val btn = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            btn.isEnabled = false  // disable sampai lookup selesai
+            btn.text = "Mencari..."
+
+            // Lookup barcode di background
+            scope.launch {
+                val lookup = withContext(Dispatchers.IO) { ZposApi.lookupBarcode(scannedCode) }
+                withContext(Dispatchers.Main) {
+                    when (lookup.source) {
+                        "db" -> {
+                            // Sudah ada di DB — tidak bisa tambah, tampilkan info
+                            txtStatus.text = "⚠️ Produk sudah terdaftar"
+                            txtStatus.setTextColor(0xFFE65100.toInt())
+                            txtNama.setText(lookup.nama ?: "")
+                            txtNama.isEnabled = false
+                            txtHarga.isEnabled = false
+                            btn.text = "Tutup"
+                            btn.isEnabled = true
+                            btn.setOnClickListener { dialog.dismiss() }
+                        }
+                        "off" -> {
+                            txtStatus.text = "✓ Ditemukan (OpenFood Facts)"
+                            txtStatus.setTextColor(0xFF2E7D32.toInt())
+                            txtNama.setText(lookup.nama ?: "")
+                            txtHarga.requestFocus()
+                            btn.text = "Simpan"
+                            btn.isEnabled = true
+                            btn.setOnClickListener {
+                                val nama = txtNama.text.toString().trim()
+                                val harga = parseHargaUang(txtHarga.text.toString())
+                                if (nama.isEmpty()) { Toast.makeText(this@MainActivity, "Nama wajib diisi", Toast.LENGTH_SHORT).show(); return@setOnClickListener }
+                                if (harga <= 0L) { Toast.makeText(this@MainActivity, "Harga harus > 0", Toast.LENGTH_SHORT).show(); return@setOnClickListener }
+                                simpanProdukBarcode(dialog, btn, nama, harga, scannedCode, labelQty)
+                            }
+                        }
+                        else -> {
+                            txtStatus.text = "⚠️ Barcode tidak dikenali — ketik manual"
+                            txtStatus.setTextColor(0xFFC62828.toInt())
+                            txtNama.requestFocus()
+                            btn.text = "Simpan"
+                            btn.isEnabled = true
+                            btn.setOnClickListener {
+                                val nama = txtNama.text.toString().trim()
+                                val harga = parseHargaUang(txtHarga.text.toString())
+                                if (nama.isEmpty()) { Toast.makeText(this@MainActivity, "Nama wajib diisi", Toast.LENGTH_SHORT).show(); return@setOnClickListener }
+                                if (harga <= 0L) { Toast.makeText(this@MainActivity, "Harga harus > 0", Toast.LENGTH_SHORT).show(); return@setOnClickListener }
+                                simpanProdukBarcode(dialog, btn, nama, harga, scannedCode, labelQty)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        dialog.show()
+    }
+
+    /** Simpan produk baru dengan barcode ke server, cetak label bila qty > 0. */
+    private fun simpanProdukBarcode(
+        dialog: AlertDialog, btn: android.widget.Button,
+        nama: String, harga: Long, barcode: String, qtyLabel: Int
+    ) {
+        if (!btn.isEnabled) return
+        btn.isEnabled = false
+        btn.text = "Menyimpan..."
+        scope.launch {
+            val kategori = ZposApi.kategoriUtama()
+            val hasil: Result<Long?> =
+                if (kategori.isSuccess) ZposApi.simpanProduk(nama, harga.toDouble(), kategori.getOrThrow(), barcode)
+                else Result.failure(kategori.exceptionOrNull()!!)
+            withContext(Dispatchers.Main) {
+                if (hasil.isSuccess) {
+                    Logger.log(this@MainActivity, "produk", "tambah-barcode: tersimpan '$nama' bc=$barcode")
+                    dialog.dismiss()
+                    loadProduk {
+                        if (qtyLabel > 0) {
+                            hasil.getOrNull()?.let { pid ->
+                                tandaiCetakQty(mapOf(pid to qtyLabel))
+                            }
+                        }
+                    }
+                } else {
+                    val err = hasil.exceptionOrNull()?.message ?: "Gagal"
+                    Logger.log(this@MainActivity, "produk", "tambah-barcode GAGAL: $err")
+                    Toast.makeText(this@MainActivity, "Gagal: $err", Toast.LENGTH_LONG).show()
+                    btn.isEnabled = true
+                    btn.text = "Simpan"
+                }
             }
         }
     }
