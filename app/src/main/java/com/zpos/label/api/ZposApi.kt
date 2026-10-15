@@ -39,6 +39,11 @@ object ZposApi {
     @Volatile var baseUrl: String = "https://z1pos.zomet.my.id"
     @Volatile var cookie: String = ""
     @Volatile var namaToko: String = ""
+    @Volatile var namaUser: String = ""
+    @Volatile var emailUser: String = ""
+    @Volatile var planToko: String = ""      // "pro" | "free" | "demo" | ""
+    @Volatile var tokoAktif: Boolean = true
+    @Volatile var tokoExpired: Boolean = false
 
     /** Login pakai email+sandi z1pos (POST /api/auth/login, set cookie zpos_token).
      *  Juga baca body response utk nama toko (multi-tenant). */
@@ -95,7 +100,9 @@ object ZposApi {
         } catch (_: Exception) { email }
     }
 
-    /** GET /api/auth/me — fallback utk nama toko bila login response tak punya. */
+    /** GET /api/auth/me — fallback utk nama toko + profil user bila login response tak punya.
+     *  Response ZPos: { nama, userName, email, plan, role, aktif, expired, isDemo, ... }
+     *  Set field namaToko, namaUser, emailUser, planToko, tokoAktif, tokoExpired. */
     fun ambilProfil(): String {
         if (cookie.isEmpty()) return ""
         return try {
@@ -105,11 +112,16 @@ object ZposApi {
                 val txt = conn.inputStream.bufferedReader().use { it.readText() }
                 if (txt.isBlank() || txt == "null") return ""
                 val o = JSONObject(txt)
-                listOf("nama_toko", "toko", "store_name", "store", "nama")
-                    .firstNotNullOfOrNull { key ->
-                        o.optString(key).takeIf { it.isNotBlank() && it != "null" }
-                    }
-                    ?: ""
+                // nama toko (tenant) — field "nama" di /api/auth/me = nama toko fresh from DB
+                namaToko = listOf("nama", "nama_toko", "toko", "store_name", "store")
+                    .firstNotNullOfOrNull { key -> o.optString(key).takeIf { it.isNotBlank() && it != "null" } }
+                    ?: namaToko
+                namaUser = o.optString("userName").takeIf { it.isNotBlank() && it != "null" } ?: namaUser
+                emailUser = o.optString("email").takeIf { it.isNotBlank() && it != "null" } ?: emailUser
+                planToko = o.optString("plan").takeIf { it.isNotBlank() && it != "null" } ?: planToko
+                tokoAktif = o.optBoolean("aktif", true)
+                tokoExpired = o.optBoolean("expired", false)
+                namaToko
             } finally { conn.disconnect() }
         } catch (_: Exception) { "" }
     }

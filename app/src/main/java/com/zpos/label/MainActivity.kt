@@ -78,7 +78,11 @@ class MainActivity : AppCompatActivity() {
     private var paperH = 15
     private var proto = "tspl"              // "tspl" (printer label clabel/... ) | "esc"
     private var fontMul = 1                  // 1|2|3 => S/M/L utk TEXT nama & harga label (seragam)
-    private var namaToko = ""               // nama toko aktif (dari login / API)
+    private var namaToko = ""               // nama toko aktif / tenant (dari login / API)
+    private var namaUser = ""               // nama pegawai login
+    private var emailUser = ""              // email pegawai login
+    private var planToko = ""               // "pro" | "free" | "demo" | ""
+    private var tokoExpired = false         // langganan expired?
     private var barcodeMode = "1d"           // "1d" (EAN-13/Code128) | "2d" (QR)
     private var bcSrc = "6"                  // "6" (barcode_internal label) | "13" (barcode asli)
 
@@ -156,6 +160,10 @@ class MainActivity : AppCompatActivity() {
         barcodeMode = prefs.getString("barcodeMode", "1d") ?: "1d"
         bcSrc = prefs.getString("bcSrc", "6") ?: "6"
         namaToko = prefs.getString("nama_toko", "") ?: ""
+        namaUser = prefs.getString("nama_user", "") ?: ""
+        emailUser = prefs.getString("email_user", "") ?: ""
+        planToko = prefs.getString("plan_toko", "") ?: ""
+        tokoExpired = prefs.getBoolean("toko_expired", false)
         b.btnFont.text = "Font: " + fontLabel(fontMul)
         b.btnBarcode.text = barcodeBtnLabel()
         b.btnBcSrc.text = bcSrcBtnLabel()
@@ -932,19 +940,27 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     Logger.log(this@MainActivity, "login", "sukses $email")
                     prefs.edit().putString("email", email).putString("sandi", sandi).apply()
-                    // Nama toko dari login response; fallback /api/auth/me
+                    // Nama toko + profil user dari login response; fallback /api/auth/me
                     namaToko = ZposApi.namaToko.ifBlank { email }
-                    if (ZposApi.namaToko.isBlank()) {
-                        scope.launch {
-                            val profil = ZposApi.ambilProfil()
-                            if (profil.isNotBlank()) {
-                                namaToko = profil
-                                prefs.edit().putString("nama_toko", namaToko).apply()
-                                withContext(Dispatchers.Main) { updateTokoLabel() }
-                            }
+                    // Selalu ambil profil utk userName + plan (login response = {ok:true}, tak punya data)
+                    scope.launch {
+                        val profil = ZposApi.ambilProfil()
+                        if (profil.isNotBlank()) {
+                            namaToko = ZposApi.namaToko.ifBlank { email }
+                            namaUser = ZposApi.namaUser
+                            emailUser = ZposApi.emailUser.ifBlank { email }
+                            planToko = ZposApi.planToko
+                            tokoExpired = ZposApi.tokoExpired
+                            prefs.edit()
+                                .putString("nama_toko", namaToko)
+                                .putString("nama_user", namaUser)
+                                .putString("email_user", emailUser)
+                                .putString("plan_toko", planToko)
+                                .putBoolean("toko_expired", tokoExpired)
+                                .apply()
+                            withContext(Dispatchers.Main) { updateTokoLabel() }
                         }
                     }
-                    prefs.edit().putString("nama_toko", namaToko).apply()
                     b.lblLogin.text = ""
                     showMain()
                 }
@@ -1184,14 +1200,44 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    /** Update top bar + drawer header dgn nama toko aktif. */
+    /** Update top bar + drawer header dgn nama toko + user + plan badge. */
     private fun updateTokoLabel() {
-        val display = namaToko.ifBlank { "Produk" }
-        b.txtTokoName.text = display
+        // Top bar: nama toko (compact)
+        b.txtTokoName.text = namaToko.ifBlank { "Produk" }
         // Drawer header: akses manual (headerLayout tak ter-bind di ActivityMainBinding)
-        val header = b.navDrawer.getHeaderView(0)
-        header?.findViewById<android.widget.TextView>(com.zpos.label.R.id.txtDrawerToko)?.text =
+        val header = b.navDrawer.getHeaderView(0) ?: return
+        header.findViewById<android.widget.TextView>(com.zpos.label.R.id.txtDrawerToko)?.text =
             namaToko.ifBlank { "Z1 Label" }
+        header.findViewById<android.widget.TextView>(com.zpos.label.R.id.txtDrawerUser)?.text =
+            namaUser.ifBlank { namaToko.ifBlank { "Z1 Label" } }
+        header.findViewById<android.widget.TextView>(com.zpos.label.R.id.txtDrawerEmail)?.text =
+            emailUser
+        // Avatar = inisial nama user (atau toko)
+        val inisial = (namaUser.ifBlank { namaToko }).firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+        header.findViewById<android.widget.TextView>(com.zpos.label.R.id.txtAvatar)?.text = inisial
+        // Plan badge
+        val badge = header.findViewById<android.widget.TextView>(com.zpos.label.R.id.txtBadgePlan)
+        if (badge != null) {
+            val planDisplay = when {
+                tokoExpired -> "EXPIRED"
+                planToko.isNotBlank() -> planToko.uppercase()
+                else -> ""
+            }
+            if (planDisplay.isNotEmpty()) {
+                badge.text = planDisplay
+                badge.visibility = View.VISIBLE
+                // Warna badge: expired=merah, demo=orange, pro=putih semi, lain=putih semi
+                badge.setTextColor(
+                    when {
+                        tokoExpired -> 0xFFFFCDD2.toInt()
+                        planToko.equals("demo", true) -> 0xFFFFE082.toInt()
+                        else -> 0xFFFFFFFF.toInt()
+                    }
+                )
+            } else {
+                badge.visibility = View.GONE
+            }
+        }
     }
 
     private fun setPrinterLabel() {

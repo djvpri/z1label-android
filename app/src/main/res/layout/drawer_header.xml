@@ -6,20 +6,89 @@
     android:background="@color/z1_primary"
     android:padding="18dp">
 
-    <TextView
-        android:layout_width="wrap_content"
+    <!-- Avatar + User/Tenant info -->
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Pengaturan Label"
-        android:textColor="@color/z1_on_primary"
-        android:textSize="20sp"
-        android:textStyle="bold" />
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
 
-    <TextView
-        android:id="@+id/txtDrawerToko"
+        <TextView
+            android:id="@+id/txtAvatar"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/avatar_bg"
+            android:gravity="center"
+            android:text="?"
+            android:textColor="@color/z1_on_primary"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginEnd="12dp" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/txtDrawerUser"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="—"
+                android:textColor="@color/z1_on_primary"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:singleLine="true"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/txtDrawerToko"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Z1 Label"
+                android:textColor="@color/teal_200"
+                android:textSize="13sp"
+                android:singleLine="true"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/txtDrawerEmail"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text=""
+                android:textColor="#80CBC4"
+                android:textSize="12sp"
+                android:singleLine="true"
+                android:ellipsize="end" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Badge row: plan + role -->
+    <LinearLayout
+        android:id="@+id/badgeRow"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:text="Z1 Label"
-        android:textColor="@color/teal_200"
-        android:textSize="13sp" />
+        android:orientation="horizontal"
+        android:layout_marginTop="10dp">
+
+        <TextView
+            android:id="@+id/txtBadgePlan"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/badge_plan_bg"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="3dp"
+            android:text=""
+            android:textColor="@color/z1_on_primary"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:textAllCaps="true"
+            android:letterSpacing="0.05"
+            android:visibility="gone"
+            android:layout_marginEnd="6dp" />
+    </LinearLayout>
+
 </LinearLayout>
