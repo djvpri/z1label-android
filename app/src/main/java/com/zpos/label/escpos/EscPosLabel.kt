@@ -20,6 +20,10 @@ import java.io.ByteArrayOutputStream
 object EscPosLabel {
 
     const val DOTS_PER_MM = 8.0 // 203 dpi thermal
+    /** Printer label ini mencetak geometri BARCODE ~0,73x dari angka perintah (terukur dari 2
+     *  foto cetak 40x30: lebar 173/237 & 174/237, tinggi 99/140 & 104/140). Kompensasi supaya
+     *  bar mengisi label. Hanya dipakai jalur label besar (40x30); ukuran lain tak berubah. */
+    private const val TSPL_BC_SCALE = 0.73
 
     /** Buat label 25x15mm: nama + (harga opt) + barcode 128-C v3. */
     fun buatLabel(
@@ -256,7 +260,10 @@ object EscPosLabel {
         val bigGap = if (bigLabel) 34 else 0
         val barY = yB + bigGap                       // posisi-y BARCODE (di bawah gap besar)
         val barH = if (bigLabel)
-            // dari barY, sisakan ~18 dot utk nomor barcode & marjin bawah (anti keluar kanvas)
+            // dari barY, sisakan ~18 dot utk nomor barcode & marjin bawah (anti keluar kanvas).
+            // CATATAN: printer memampatkan SEMUA koordinat-y & tinggi ~0,735x, jadi bar sudah
+            // mentok: 82+140=222 cmd -> tercetak 163 dot, tepat di atas nomor. Menambah barH
+            // (mis. 158 = sisa kanvas) TIDAK menambah tinggi tercetak, malah menabrak nomor.
             (h - barY - 18).coerceAtLeast(24)
         else
             (h * 44 / 120).coerceIn(16, (h - yB - 6).coerceAtLeast(16))
@@ -301,9 +308,9 @@ object EscPosLabel {
                 out.write("BARCODE $bcX,$barY,\"${barcodeKodeTsp(l.bc)}\",$barH,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
                 if (bigLabel) {
                     // Nomor barcode di bawah garis (label besar 40x30) biar terbaca & label penuh.
-                    // Font "1" mul 1: teks center, font ≈4 dot/char.
-                    val txt = clipTsp(l.bc, (w / 4).coerceAtLeast(8))
-                    val xTxt = ((w - txt.length * 4) / 2).coerceAtLeast(0)
+                    // Center pakai lebar glyph sama dgn TEXT lain (8 dot/char), bukan 4 -> tak geser kanan.
+                    val txt = clipTsp(l.bc, (w / 8).coerceAtLeast(8))
+                    val xTxt = centerXTsP(txt.length, 1, w)
                     out.write("TEXT $xTxt,$yBcText,\"1\",0,1,1,\"$txt\"$eol".toByteArray(Charsets.US_ASCII))
                 }
             }
@@ -347,16 +354,14 @@ object EscPosLabel {
      * @return [x (right-ish), narrow]
      */
     private fun barcodeGeoBigR(bc: String, w: Int): Pair<Int, Int> {
-        val (bw, n) = if (bc.length == 13 && bc.all { it.isDigit() }) {
-            val n = 2                      // 2 dot/modul (24 mm utk EAN-13 di 40mm), pas & terbaca
-            (Ean13.TOTAL_MODUL * n) to n
-        } else {
-            val total = (Code128.encodeCDigits(bc) ?: Code128.encodeBText(bc)).totalModul.coerceAtLeast(10)
-            val n = ((w * 9 / 10 - 4) / total).coerceIn(1, 4)
-            (total * n) to n
-        }
-        // margin kanan sisakan ~6 dot (≈0.75 mm): barcode berhenti pas sebelum tepi.
-        val x = if (bw > w - 2) 0 else (w - bw - 6).coerceAtLeast(0)
+        val total = if (bc.length == 13 && bc.all { it.isDigit() }) Ean13.TOTAL_MODUL
+        else (Code128.encodeCDigits(bc) ?: Code128.encodeBText(bc)).totalModul.coerceAtLeast(10)
+        // Printer ini mencetak geometri BARCODE ~0,73x dari angka perintah (terukur 2 foto cetak
+        // 40x30: lebar 173/237 & 174/237, tinggi 99/140 & 104/140). Hitung `n` + `x` dari lebar
+        // TERCETAK supaya bar mengisi label, marjin kiri/kanan sama (~12 dot), bukan menggantung.
+        val n = ((w - 24) / (total * TSPL_BC_SCALE)).toInt().coerceIn(1, 5)
+        val bwReal = (total * n * TSPL_BC_SCALE).toInt()
+        val x = ((w - bwReal) / 2).coerceAtLeast(0)
         return x to n
     }
 
