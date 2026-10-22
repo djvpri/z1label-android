@@ -261,11 +261,10 @@ object EscPosLabel {
         else
             (h * 44 / 120).coerceIn(16, (h - yB - 6).coerceAtLeast(16))
         val yBcText = if (bigLabel) barY + barH + 2 else -1
-        // Nama label BESAR (40x30): font TSPL nyata ≈ 13 dot/char (bukan estimasi 4-5 yg lama).
-        // Batas ini diambil dr kasus nyata 40x30 ("Fire Rescue Cartoon Fire" = ~24 char baru muat
-        // 1 baris; nama yg melebihi dibiarkan engine wrap → menimpa baris Harga). Dipotong pasti
-        // ≤ 1 baris + "..." dgn sisa muat aman. Ukuran lain (h<240) tetap namaMaxChar lama.
-        val nbNama = if (bigLabel) ((w - 16) / 13).coerceAtLeast(10) else 0
+        // Nama label BESAR (40x30): font TSPL "1" lebar nyata ≈8 dot/char (terukur dr cetakan:
+        // 23 char = 186 dot = 23.2 mm). Kalibrasi lama 13 dot/char (dari foto ber-skew) terlalu
+        // besar -> nama dipotong 23 char padahal muat ~38 -> info terbuang & "..." muncul cepat.
+        val nbNama = if (bigLabel) ((w - 16) / 8).coerceAtLeast(10) else 0
         // NOTE multi-label (v1.6.11): PER-LABEL job utuh — setiap label = SIZE h + GAP + CLS +
         // isi (TEXT/BARCODE, y TANPA offset, semua dalam kanvas) + PRINT 1,1 + FORFEED <h>.
         //   - per-label SIZE h = kanvas SATU label (aturan TSPL: SIZE = 1 kanvas; zona idx*step
@@ -378,9 +377,10 @@ object EscPosLabel {
     /** QR (preview/screen): sama dgn qrGeo print — module & x-tengah. */
     private fun previewQrGeo(bc: String, w: Int, h: Int, topY: Int): Pair<Int, Int> = qrGeo(bc, w, h, topY)
 
-    /** x-center utk TEXT TSPL font "1" (lebar ≈4 dot/char × mul). Label besar (40x30) teks tengah. */
+    /** x-center utk TEXT TSPL font "1": lebar nyata ≈8 dot/char (terukur dr cetakan 40x30 —
+     *  23 char = 186 dot). Konstanta lama 4 dot/char bikin teks bergeser KANAN & mentok tepi. */
     private fun centerXTsP(len: Int, mul: Int, w: Int): Int =
-        ((w - len * 4 * mul) / 2).coerceAtLeast(1)
+        ((w - len * 8 * mul) / 2).coerceAtLeast(1)
 
     /** Buang karakter yg bisa merusak perintah TSPL. */
     private fun sanitizeTsp(s: String): String = s.filter { it in '0'..'9' || it in 'A'..'Z' || it in 'a'..'z' || it == ' ' }
