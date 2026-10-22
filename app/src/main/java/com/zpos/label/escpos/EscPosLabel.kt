@@ -24,6 +24,11 @@ object EscPosLabel {
      *  foto cetak 40x30: lebar 173/237 & 174/237, tinggi 99/140 & 104/140). Kompensasi supaya
      *  bar mengisi label. Hanya dipakai jalur label besar (40x30); ukuran lain tak berubah. */
     private const val TSPL_BC_SCALE = 0.73
+    /** Lebar & tinggi glyph nyata per multiplier (terukur dari cetakan v1.8.0 40x30: nama
+     *  "…" 24 char = 237 dot -> 9,9; digit ×3 = 60 dot -> 20/mult). Dokumentasi font "1" = 8x12
+     *  TIDAK cocok dgn printer ini; pakai angka terukur supaya center & clip benar. */
+    private const val CW_BIG = 10
+    private const val CH_BIG = 20
 
     /** Buat label 25x15mm: nama + (harga opt) + barcode 128-C v3. */
     fun buatLabel(
@@ -266,7 +271,7 @@ object EscPosLabel {
         // Nama label BESAR (40x30): font TSPL "1" lebar nyata ≈8 dot/char (terukur dr cetakan:
         // 23 char = 186 dot = 23.2 mm). Kalibrasi lama 13 dot/char (dari foto ber-skew) terlalu
         // besar -> nama dipotong 23 char padahal muat ~38 -> info terbuang & "..." muncul cepat.
-        val nbNama = if (bigLabel) ((w - 16) / 8).coerceAtLeast(10) else 0
+        val nbNama = if (bigLabel) ((w - 16) / CW_BIG).coerceAtLeast(10) else 0
         // NOTE multi-label (v1.6.11): PER-LABEL job utuh — setiap label = SIZE h + GAP + CLS +
         // isi (TEXT/BARCODE, y TANPA offset, semua dalam kanvas) + PRINT 1,1 + FORFEED <h>.
         //   - per-label SIZE h = kanvas SATU label (aturan TSPL: SIZE = 1 kanvas; zona idx*step
@@ -285,8 +290,8 @@ object EscPosLabel {
                 val (mQ, xQ) = qrGeo(l.bc, w, h, barY)
                 val qrH = (h * 44 / 120).coerceIn(16, (h - barY - 6).coerceAtLeast(16))
                 val bcSan = sanitizeTsp(l.bc)
-                val xN2 = if (bigLabel) centerXTsP(clipTsp(l.nama, nbNama).length, fm, w) else 4
-                val xH2 = if (bigLabel) centerXTsP(hRibu.length, fm, w) else 4
+                val xN2 = if (bigLabel) centerXTsP(clipTsp(l.nama, nbNama).length, fm, w, CW_BIG) else 4
+                val xH2 = if (bigLabel) centerXTsP(hRibu.length, fm, w, CW_BIG) else 4
                 out.write("TEXT $xN2,$yN,\"1\",0,$fm,$fm,\"${clipTsp(l.nama, if (bigLabel) nbNama else namaMaxChar(w, fm))}\"$eol".toByteArray(Charsets.US_ASCII))
                 val txtH2 = hRibu
                 out.write("TEXT $xH2,$yH,\"1\",0,$fm,$fm,\"$txtH2\"$eol".toByteArray(Charsets.US_ASCII))
@@ -298,21 +303,21 @@ object EscPosLabel {
                     // ---- Desain C2 (40x30): nama 1 baris, HARGA FULL-WIDTH ×pm, garis, barcode, nomor.
                     // Harga dapat lebar penuh (bukan pane kanan) supaya nominal panjang tak menyusut
                     // ke ×1. pm = pengali terbesar yg muat; 120.000 -> ×3 (264 dot), 12.000.000 -> ×2.
-                    val pm = (3 downTo 1).firstOrNull { hTxt.length * 8 * it <= w - 16 } ?: 1
-                    val fhP = 12 * pm
-                    val yH2 = yN + 12 + 6                    // 22 (di bawah nama 1 baris)
+                    val pm = (3 downTo 1).firstOrNull { hTxt.length * CW_BIG * it <= w - 16 } ?: 1
+                    val fhP = CH_BIG * pm                     // tinggi glyph NYATA (bukan 12*pm)
+                    val yH2 = yN + CH_BIG + 4                 // 28: di bawah nama (glyph nama ~20)
                     val barY2 = yH2 + fhP + 40               // jarak harga↔barcode 0,5 cm (40 dot), aturan user
-                    val barH2 = (h - barY2 - 34).coerceAtLeast(24)   // 108: sisakan nomor + marjin bawah
+                    val barH2 = (h - barY2 - 34).coerceAtLeast(24)   // 80 (pm3): sisakan nomor + marjin bawah
                     val yTxt2 = barY2 + barH2 + 2
-                    val xN2 = centerXTsP(clipTsp(l.nama, nbNama).length, 1, w)
-                    val xH2 = centerXTsP(hTxt.length, pm, w)
+                    val xN2 = centerXTsP(clipTsp(l.nama, nbNama).length, 1, w, CW_BIG)
+                    val xH2 = centerXTsP(hTxt.length, pm, w, CW_BIG)
                     out.write("TEXT $xN2,$yN,\"1\",0,1,1,\"${clipTsp(l.nama, nbNama)}\"$eol".toByteArray(Charsets.US_ASCII))
                     out.write("TEXT $xH2,$yH2,\"1\",0,$pm,$pm,\"$hTxt\"$eol".toByteArray(Charsets.US_ASCII))
-                    // Garis pemisah harga↔barcode (BAR: x,y,lebar,tebal). y = bawah harga + 6.
+                    // Garis pemisah harga↔barcode (BAR: x,y,lebar,tebal). y = bawah glyph harga + 6.
                     out.write("BAR 10,${yH2 + fhP + 6},300,2$eol".toByteArray(Charsets.US_ASCII))
                     out.write("BARCODE $bcX,$barY2,\"${barcodeKodeTsp(l.bc)}\",$barH2,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
-                    val txt = clipTsp(l.bc, (w / 8).coerceAtLeast(8))
-                    out.write("TEXT ${centerXTsP(txt.length, 1, w)},$yTxt2,\"1\",0,1,1,\"$txt\"$eol".toByteArray(Charsets.US_ASCII))
+                    val txt = clipTsp(l.bc, (w / CW_BIG).coerceAtLeast(8))
+                    out.write("TEXT ${centerXTsP(txt.length, 1, w, CW_BIG)},$yTxt2,\"1\",0,1,1,\"$txt\"$eol".toByteArray(Charsets.US_ASCII))
                 } else {
                     val xN = 4
                     val xH = 4
@@ -391,8 +396,8 @@ object EscPosLabel {
 
     /** x-center utk TEXT TSPL font "1": lebar nyata ≈8 dot/char (terukur dr cetakan 40x30 —
      *  23 char = 186 dot). Konstanta lama 4 dot/char bikin teks bergeser KANAN & mentok tepi. */
-    private fun centerXTsP(len: Int, mul: Int, w: Int): Int =
-        ((w - len * 8 * mul) / 2).coerceAtLeast(1)
+    private fun centerXTsP(len: Int, mul: Int, w: Int, cw: Int = 8): Int =
+        ((w - len * cw * mul) / 2).coerceAtLeast(1)
 
     /** Buang karakter yg bisa merusak perintah TSPL. */
     private fun sanitizeTsp(s: String): String = s.filter { it in '0'..'9' || it in 'A'..'Z' || it in 'a'..'z' || it == ' ' }
