@@ -932,7 +932,14 @@ class MainActivity : AppCompatActivity() {
         }
         b.lblLogin.text = "Memproses..."
         scope.launch {
-            val err = ZposApi.login(email, sandi)
+            // PITFALL: exception jaringan (SocketTimeout / SSL handshake / UnknownHost) yg dilempar
+            // dari login() dulu NYEMPLUNG ke CoroutineExceptionHandler -> withContext(Main) di bawah
+            // tak pernah jalan -> label "Memproses..." nyangkut SELAMANYA (v1.8.1). Tangkap di sini.
+            val err = try {
+                ZposApi.login(email, sandi)
+            } catch (e: Exception) {
+                "jaringan: ${e.javaClass.simpleName} ${e.message ?: ""}".trim()
+            }
             withContext(Dispatchers.Main) {
                 if (err != null) {
                     Logger.log(this@MainActivity, "login", "gagal: $err")

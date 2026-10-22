@@ -49,31 +49,45 @@ object ZposApi {
      *  Juga baca body response utk nama toko (multi-tenant). */
     fun login(email: String, sandi: String): String? {
         val body = "{\"email\":${JSONObject.quote(email)},\"password\":${JSONObject.quote(sandi)}}"
-        val conn = URL("$baseUrl/api/auth/login").openConnection() as HttpURLConnection
-        try {
-            conn.requestMethod = "POST"
-            conn.doOutput = true
-            conn.connectTimeout = 15000
-            conn.readTimeout = 30000
-            conn.setRequestProperty("Content-Type", "application/json")
-            conn.outputStream.use { it.write(body.toByteArray()) }
-            val code = conn.responseCode
-            val set = conn.headerFields?.get("set-cookie") ?: emptyList()
-            var gotCookie = false
-            for (h in set) {
-                h.split(";").forEach { p ->
-                    val kv = p.trim().split("=", limit = 2)
-                    if (kv.size == 2 && kv[0] == "zpos_token") { cookie = kv[1]; gotCookie = true }
+        // Timeout pendek + 1 retry: jaringan 4G sering macet >20 s (terukur dari host: 11/20 request
+        // menggantung 20 s lalu timeout). readTimeout 30 s lama = user cuma lihat "Memproses..."
+        // setengah menit. 2 percobaan x ~13 s lebih cepat sembuh.
+        var last = "Login gagal (jaringan)"
+        repeat(2) { att ->
+            val conn = URL("$baseUrl/api/auth/login").openConnection() as HttpURLConnection
+            try {
+                conn.requestMethod = "POST"
+                conn.doOutput = true
+                conn.connectTimeout = 8000
+                conn.readTimeout = 12000
+                conn.setRequestProperty("Content-Type", "application/json")
+                conn.outputStream.use { it.write(body.toByteArray()) }
+                val code = conn.responseCode
+                val set = conn.headerFields?.get("set-cookie") ?: emptyList()
+                var gotCookie = false
+                for (h in set) {
+                    h.split(";").forEach { p ->
+                        val kv = p.trim().split("=", limit = 2)
+                        if (kv.size == 2 && kv[0] == "zpos_token") { cookie = kv[1]; gotCookie = true }
+                    }
                 }
-            }
-            // Baca body sukses utk nama toko
-            if (gotCookie && code in 200..299) {
-                val respBody = conn.inputStream?.bufferedReader()?.use { it.readText() } ?: ""
-                namaToko = parseNamaToko(respBody, email)
-            }
-            if (gotCookie) return null
-            return conn.errorStream?.let { String(it.readBytes()) } ?: "Login gagal ($code)"
-        } finally { conn.disconnect() }
+                // Baca body sukses utk nama toko
+                if (gotCookie && code in 200..299) {
+                    val respBody = conn.inputStream?.bufferedReader()?.use { it.readText() } ?: ""
+                    namaToko = parseNamaToko(respBody, email)
+                }
+                if (gotCookie) return null
+                // 4xx = kredensial salah; jangan retry (pasti sama hasilnya).
+                if (code in 400..499) {
+                    return conn.errorStream?.let { String(it.readBytes()) } ?: "Login gagal ($code)"
+                }
+                last = conn.errorStream?.let { String(it.readBytes()) } ?: "Login gagal ($code)"
+            } catch (e: Exception) {
+                last = "jaringan: ${e.javaClass.simpleName}"
+            } finally { conn.disconnect() }
+            if (att == 0) Thread.sleep(800)
+        }
+        return last
     }
 
     /** Ambil nama toko dari berbagai kemungkinan field di JSON response login. */
@@ -198,27 +212,33 @@ object ZposApi {
     /** Ambil semua produk aktif toko. */
     fun daftarProduk(): Result<List<Produk>> {
         if (cookie.isEmpty()) return Result.failure(IllegalStateException("Belum login"))
-        val conn = open("$baseUrl/api/produk?semua=1", null)
-        try {
-            val code = conn.responseCode
-            if (code != 200) return Result.failure(IllegalStateException("HTTP $code"))
-            val txt = conn.inputStream.bufferedReader().use { it.readText() }
-            val arr = JSONArray(txt) // ?semua=1 -> array langsung (cek route)
-            val list = ArrayList<Produk>()
-            for (i in 0 until arr.length()) {
-                val o = arr.getJSONObject(i)
-                list.add(Produk(
-                    id = o.optLong("id"),
-                    nama = listOf("nama", "name", "nama_produk")
-                        .firstNotNullOfOrNull { o.optString(it).takeIf { it.isNotBlank() } } ?: "",
-                    barcode = o.optString("barcode").takeIf { it.isNotEmpty() },
-                    barcodeInternal = o.optString("barcode_internal").takeIf { it.isNotEmpty() },
-                    harga = formatHarga(o.optString("harga")),
-                    satuan = o.optString("satuan").takeIf { it.isNotEmpty() }
-                ))
-            }
-            return Result.success(list)
-        } finally { conn.disconnect() }
+        // Tangkap exception jaringan: dulu lempar ke CoroutineExceptionHandler -> loader "Memuat
+        // produk..." tak pernah berhenti & tak ada pesan (gejala "loading tak kunjung selesai").
+        return try {
+            val conn = open("$baseUrl/api/produk?semua=1", null)
+            try {
+                val code = conn.responseCode
+                if (code != 200) return Result.failure(IllegalStateException("HTTP $code"))
+                val txt = conn.inputStream.bufferedReader().use { it.readText() }
+                val arr = JSONArray(txt) // ?semua=1 -> array langsung (cek route)
+                val list = ArrayList<Produk>()
+                for (i in 0 until arr.length()) {
+                    val o = arr.getJSONObject(i)
+                    list.add(Produk(
+                        id = o.optLong("id"),
+                        nama = listOf("nama", "name", "nama_produk")
+                            .firstNotNullOfOrNull { o.optString(it).takeIf { it.isNotBlank() } } ?: "",
+                        barcode = o.optString("barcode").takeIf { it.isNotEmpty() },
+                        barcodeInternal = o.optString("barcode_internal").takeIf { it.isNotEmpty() },
+                        harga = formatHarga(o.optString("harga")),
+                        satuan = o.optString("satuan").takeIf { it.isNotEmpty() }
+                    ))
+                }
+                Result.success(list)
+            } finally { conn.disconnect() }
+        } catch (e: Exception) {
+            Result.failure(IllegalStateException("jaringan: ${e.javaClass.simpleName}", e))
+        }
     }
 
     private fun formatHarga(v: String): String {
@@ -329,8 +349,8 @@ object ZposApi {
 
     private fun open(url: String, body: ByteArray?): HttpURLConnection {
         val conn = URL(url).openConnection() as HttpURLConnection
-        conn.connectTimeout = 15000
-        conn.readTimeout = 30000
+        conn.connectTimeout = 10000
+        conn.readTimeout = 20000
         conn.setRequestProperty("Cookie", "zpos_token=$cookie")
         if (body != null) {
             conn.requestMethod = "POST"
