@@ -258,16 +258,11 @@ object EscPosLabel {
         // Spasi teks(harga)↔barcode utk 40x30 = 0,5 cm (40 dot dr bawah harga). Grund gap6 sudah ada di yB,
         // jadi tambah 34 di sini. Ukuran lain (h<240) gap 0 (perilaku lama).
         val bigGap = if (bigLabel) 34 else 0
-        val barY = yB + bigGap                       // posisi-y BARCODE (di bawah gap besar)
+        val barY = yB + bigGap                       // posisi-y BARCODE ukuran lain (bigLabel pakai barY2 di C2)
         val barH = if (bigLabel)
-            // dari barY, sisakan ~18 dot utk nomor barcode & marjin bawah (anti keluar kanvas).
-            // CATATAN: printer memampatkan SEMUA koordinat-y & tinggi ~0,735x, jadi bar sudah
-            // mentok: 82+140=222 cmd -> tercetak 163 dot, tepat di atas nomor. Menambah barH
-            // (mis. 158 = sisa kanvas) TIDAK menambah tinggi tercetak, malah menabrak nomor.
             (h - barY - 18).coerceAtLeast(24)
         else
             (h * 44 / 120).coerceIn(16, (h - yB - 6).coerceAtLeast(16))
-        val yBcText = if (bigLabel) barY + barH + 2 else -1
         // Nama label BESAR (40x30): font TSPL "1" lebar nyata ≈8 dot/char (terukur dr cetakan:
         // 23 char = 186 dot = 23.2 mm). Kalibrasi lama 13 dot/char (dari foto ber-skew) terlalu
         // besar -> nama dipotong 23 char padahal muat ~38 -> info terbuang & "..." muncul cepat.
@@ -297,21 +292,33 @@ object EscPosLabel {
                 out.write("TEXT $xH2,$yH,\"1\",0,$fm,$fm,\"$txtH2\"$eol".toByteArray(Charsets.US_ASCII))
                 out.write("BARCODE $xQ,$barY,\"QRCODE\",$qrH,0,0,$mQ,\"$bcSan\"$eol".toByteArray(Charsets.US_ASCII))
             } else {
-                // bigLabel (40x30): geser barcode ke KANAN (habiskan ruang kosong kanan), sisakan marjin kecil.
                 val (bcX, bcN) = if (bigLabel) barcodeGeoBigR(l.bc, w) else barcodeGeo(l.bc, w)
-                // label: nama (1 baris) + harga + barcode — sisanya dihilangkan
-                val xN = if (bigLabel) centerXTsP(clipTsp(l.nama, nbNama).length, fm, w) else 4
                 val hTxt = hRibu
-                val xH = if (bigLabel) centerXTsP(hTxt.length, fm, w) else 4
-                out.write("TEXT $xN,$yN,\"1\",0,$fm,$fm,\"${clipTsp(l.nama, if (bigLabel) nbNama else namaMaxChar(w, fm))}\"$eol".toByteArray(Charsets.US_ASCII))
-                out.write("TEXT $xH,$yH,\"1\",0,$fm,$fm,\"$hTxt\"$eol".toByteArray(Charsets.US_ASCII))
-                out.write("BARCODE $bcX,$barY,\"${barcodeKodeTsp(l.bc)}\",$barH,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
                 if (bigLabel) {
-                    // Nomor barcode di bawah garis (label besar 40x30) biar terbaca & label penuh.
-                    // Center pakai lebar glyph sama dgn TEXT lain (8 dot/char), bukan 4 -> tak geser kanan.
+                    // ---- Desain C2 (40x30): nama 1 baris, HARGA FULL-WIDTH ×pm, garis, barcode, nomor.
+                    // Harga dapat lebar penuh (bukan pane kanan) supaya nominal panjang tak menyusut
+                    // ke ×1. pm = pengali terbesar yg muat; 120.000 -> ×3 (264 dot), 12.000.000 -> ×2.
+                    val pm = (3 downTo 1).firstOrNull { hTxt.length * 8 * it <= w - 16 } ?: 1
+                    val fhP = 12 * pm
+                    val yH2 = yN + 12 + 6                    // 22 (di bawah nama 1 baris)
+                    val barY2 = yH2 + fhP + 40               // jarak harga↔barcode 0,5 cm (40 dot), aturan user
+                    val barH2 = (h - barY2 - 34).coerceAtLeast(24)   // 108: sisakan nomor + marjin bawah
+                    val yTxt2 = barY2 + barH2 + 2
+                    val xN2 = centerXTsP(clipTsp(l.nama, nbNama).length, 1, w)
+                    val xH2 = centerXTsP(hTxt.length, pm, w)
+                    out.write("TEXT $xN2,$yN,\"1\",0,1,1,\"${clipTsp(l.nama, nbNama)}\"$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("TEXT $xH2,$yH2,\"1\",0,$pm,$pm,\"$hTxt\"$eol".toByteArray(Charsets.US_ASCII))
+                    // Garis pemisah harga↔barcode (BAR: x,y,lebar,tebal). y = bawah harga + 6.
+                    out.write("BAR 10,${yH2 + fhP + 6},300,2$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("BARCODE $bcX,$barY2,\"${barcodeKodeTsp(l.bc)}\",$barH2,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
                     val txt = clipTsp(l.bc, (w / 8).coerceAtLeast(8))
-                    val xTxt = centerXTsP(txt.length, 1, w)
-                    out.write("TEXT $xTxt,$yBcText,\"1\",0,1,1,\"$txt\"$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("TEXT ${centerXTsP(txt.length, 1, w)},$yTxt2,\"1\",0,1,1,\"$txt\"$eol".toByteArray(Charsets.US_ASCII))
+                } else {
+                    val xN = 4
+                    val xH = 4
+                    out.write("TEXT $xN,$yN,\"1\",0,$fm,$fm,\"${clipTsp(l.nama, namaMaxChar(w, fm))}\"$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("TEXT $xH,$yH,\"1\",0,$fm,$fm,\"$hTxt\"$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("BARCODE $bcX,$barY,\"${barcodeKodeTsp(l.bc)}\",$barH,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
                 }
             }
             out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))
