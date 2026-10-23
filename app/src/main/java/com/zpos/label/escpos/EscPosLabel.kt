@@ -361,17 +361,27 @@ object EscPosLabel {
     }
 
     /**
-     * Label 40x30 (bigLabel): barcode di-GESER KE KANAN (isi ruang kosong kanan), marjin kanan kecil.
-     * EAN-13 lebarnya 95 modul (bukan 131) — jd simbol ~24mm & masih ada ruang utk geser lebih ke kanan.
-     * @return [x (right-ish), narrow]
+     * Label 40x30 (bigLabel): pilih `narrow` terbesar yang MASIH menyisakan quiet zone ≥10 modul
+     * di kiri+kanan, lalu tengahkan simbol.
+     *
+     * Koreksi v1.8.3 — barcode 8-digit tak terbaca: kode lama memilih `n` dari `w` TANPA
+     * menghitung quiet zone, jadi 8-digit Code128 (79 modul) dapat narrow=5 → simbol tercetak
+     * 288 dot (36 mm) di label 40 mm → sisa margin 15,8 dot = **4,3 modul**. Spek Code128/EAN
+     * minta quiet zone **10 modul** tiap sisi; di bawah itu scanner tak pernah lock (gelap-terang
+     * di tepi label bikin threshold kacau). EAN-13 kena juga (n=4 → 7,3 modul).
+     *
+     * Rumus: n = w / (S × (total + 2×QUIET)) → 8-digit n=4 (230 dot, margin 15,3 modul),
+     * EAN-13 n=3 (208 dot). Simbol tetap digeser/tengah, tapi margin dijamin cukup.
+     * @return [x, narrow]
      */
     private fun barcodeGeoBigR(bc: String, w: Int): Pair<Int, Int> {
         val total = if (bc.length == 13 && bc.all { it.isDigit() }) Ean13.TOTAL_MODUL
         else (Code128.encodeCDigits(bc) ?: Code128.encodeBText(bc)).totalModul.coerceAtLeast(10)
         // Printer ini mencetak geometri BARCODE ~0,73x dari angka perintah (terukur 2 foto cetak
         // 40x30: lebar 173/237 & 174/237, tinggi 99/140 & 104/140). Hitung `n` + `x` dari lebar
-        // TERCETAK supaya bar mengisi label, marjin kiri/kanan sama (~12 dot), bukan menggantung.
-        val n = ((w - 24) / (total * TSPL_BC_SCALE)).toInt().coerceIn(1, 5)
+        // TERCETAK supaya bar mengisi label, tapi QUIET ZONE 10 modul wajib masuk anggaran.
+        val quiet = 10
+        val n = (w / (TSPL_BC_SCALE * (total + 2 * quiet))).toInt().coerceIn(1, 5)
         val bwReal = (total * n * TSPL_BC_SCALE).toInt()
         val x = ((w - bwReal) / 2).coerceAtLeast(0)
         return x to n
