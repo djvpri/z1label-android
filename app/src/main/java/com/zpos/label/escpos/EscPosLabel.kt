@@ -297,7 +297,7 @@ object EscPosLabel {
                 out.write("TEXT $xH2,$yH,\"1\",0,$fm,$fm,\"$txtH2\"$eol".toByteArray(Charsets.US_ASCII))
                 out.write("BARCODE $xQ,$barY,\"QRCODE\",$qrH,0,0,$mQ,\"$bcSan\"$eol".toByteArray(Charsets.US_ASCII))
             } else {
-                val (bcX, bcN) = if (bigLabel) barcodeGeoBigR(l.bc, w) else barcodeGeo(l.bc, w)
+                val (bcX, bcN) = barcodeGeo(l.bc, w)
                 val hTxt = hRibu
                 if (bigLabel) {
                     // ---- Desain C2 (40x30): nama 1 baris, HARGA FULL-WIDTH ×pm, garis, barcode, nomor.
@@ -337,53 +337,23 @@ object EscPosLabel {
         if (bc.length == 13 && bc.all { it.isDigit() }) "EAN13" else "128"
 
     /**
-     * Hitung posisi-x & narrow barcode SUPAYA MENYESUAIKAN lebar label (w dot) yang dipilih user.
-     * EAN-13: lebar = 131 module×narrow; pilih narrow terbesar agar muat (≥1), lalu tengahkan.
-     * Code128 (6-digit internal): narrow=2 tebal, fit di label >= 76 dot; x default.
-     * @return [x, narrow] utk BARCODE TSPL.
+     * Hitung [x, narrow] barcode TSPL utk SEMUA ukuran label.
+     *
+     * Aturan v1.8.4: `n` dipilih supaya QUIET ZONE 10 modul/sisi masih masuk anggaran lebar.
+     * Sebelumnya `n` diambil dari lebar penuh (`w / total`), jadi simbol mengisi label sampai
+     * tepi → quiet zone tinggal 2–4 modul → scanner tak bisa lock (kasus 40×30 8-digit v1.8.3).
+     * Modul tercetak = `n × 0,73` dot (printer memampatkan geometri ~0,73×, terukur dari cetakan).
+     * EAN-13 = 95 modul (konstanta lama 131 salah → narrow terlalu kecil, simbol 8,7 mm).
+     * @return [x (center), narrow]
      */
     private fun barcodeGeo(bc: String, wDots: Int): Pair<Int, Int> {
-        if (bc.length == 13 && bc.all { it.isDigit() }) {
-            val n = (wDots / 131).coerceAtLeast(1)
-            val bw = 131 * n
-            val x = ((wDots - bw) / 2).coerceAtLeast(1)
-            return x to n
-        }
-        // Code128 (barcode bebas panjang): hitung LEBAR NYATA dr encoder supaya muat label.
-        // Sebelumnya hardcode narrow=2 -> barcode panjang (8+ digit) overlebar -> terpotong/
-        // tak muncul. Kini narrow = w / totalModul (>=1) sehingga sebanyak-banyaknya masuk.
-        val total = (Code128.encodeCDigits(bc) ?: Code128.encodeBText(bc)).totalModul
-            .coerceAtLeast(10)   // guard: totalModul 0
-        val n = ((wDots - 4) / total).coerceIn(1, 4)   // utk pendek tetap tebal (<=4)
-        val bw = total * n
-        val x = ((wDots - bw) / 2).coerceAtLeast(1)
-        return x to n
-    }
-
-    /**
-     * Label 40x30 (bigLabel): pilih `narrow` terbesar yang MASIH menyisakan quiet zone ≥10 modul
-     * di kiri+kanan, lalu tengahkan simbol.
-     *
-     * Koreksi v1.8.3 — barcode 8-digit tak terbaca: kode lama memilih `n` dari `w` TANPA
-     * menghitung quiet zone, jadi 8-digit Code128 (79 modul) dapat narrow=5 → simbol tercetak
-     * 288 dot (36 mm) di label 40 mm → sisa margin 15,8 dot = **4,3 modul**. Spek Code128/EAN
-     * minta quiet zone **10 modul** tiap sisi; di bawah itu scanner tak pernah lock (gelap-terang
-     * di tepi label bikin threshold kacau). EAN-13 kena juga (n=4 → 7,3 modul).
-     *
-     * Rumus: n = w / (S × (total + 2×QUIET)) → 8-digit n=4 (230 dot, margin 15,3 modul),
-     * EAN-13 n=3 (208 dot). Simbol tetap digeser/tengah, tapi margin dijamin cukup.
-     * @return [x, narrow]
-     */
-    private fun barcodeGeoBigR(bc: String, w: Int): Pair<Int, Int> {
         val total = if (bc.length == 13 && bc.all { it.isDigit() }) Ean13.TOTAL_MODUL
         else (Code128.encodeCDigits(bc) ?: Code128.encodeBText(bc)).totalModul.coerceAtLeast(10)
-        // Printer ini mencetak geometri BARCODE ~0,73x dari angka perintah (terukur 2 foto cetak
-        // 40x30: lebar 173/237 & 174/237, tinggi 99/140 & 104/140). Hitung `n` + `x` dari lebar
-        // TERCETAK supaya bar mengisi label, tapi QUIET ZONE 10 modul wajib masuk anggaran.
         val quiet = 10
-        val n = (w / (TSPL_BC_SCALE * (total + 2 * quiet))).toInt().coerceIn(1, 5)
+        // Lebar command = total×n; tercetak = total×n×0,73. Anggarkan quiet zone 2×10 modul.
+        val n = (wDots / (TSPL_BC_SCALE * (total + 2 * quiet))).toInt().coerceIn(1, 5)
         val bwReal = (total * n * TSPL_BC_SCALE).toInt()
-        val x = ((w - bwReal) / 2).coerceAtLeast(0)
+        val x = ((wDots - bwReal) / 2).coerceAtLeast(0)
         return x to n
     }
 
