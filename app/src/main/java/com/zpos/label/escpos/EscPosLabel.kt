@@ -104,15 +104,20 @@ object EscPosLabel {
         // 40x30: posisi preview mengikuti cetakan (nama 1,7 mm dari tepi atas, harga s/d 9,6 mm,
         // barcode 13,3–20,4 mm, nomor ~20,6 mm) — jangan pakai rumus sc*3/sc*7.4 yg mentok atas.
         val big = h >= 240
-        val yNama = if (big) h * 0.062f else sc * 3f
-        val yHarga = if (big) h * 0.335f else sc * 7.4f
+        // 30x20 (sedang): mirror Layout A yg dicetak — nama 1,3-3,2 mm, harga 3,6-7,3 mm,
+        // barcode 8,4-12,9 mm, nomor 13,1-15,0 mm (kanvas 160 dot = 20 mm, skala cetak 0,75).
+        val med = !big && w == 240 && h == 160
+        val yNama = if (big) h * 0.062f else if (med) h * 0.066f else sc * 3f
+        val yHarga = if (big) h * 0.335f else if (med) h * 0.365f else sc * 7.4f
         paint.textSize = sc * 2.2f
         c.drawText(clipText(nama, paint, w - (sc * 2), ellipsis = true), w / 2f, yNama, paint)
         paint.textSize = sc * 3.2f
         val hsl = if (big) ribuIdn(harga) else harga
         c.drawText(hsl, w / 2f, yHarga, paint)
 
-        val topBar = if (big) (h * 0.445f).toInt() else (h - (sc * 8.4f)).toInt().coerceAtLeast(30)
+        val topBar = if (big) (h * 0.445f).toInt()
+                     else if (med) (h * 0.422f).toInt()
+                     else (h - (sc * 8.4f)).toInt().coerceAtLeast(30)
         val bcPaint = Paint().apply { color = Color.BLACK }
         if (barcode2d) {
             // QR via ZXing — render sesuai mode 2D (padat, tebal) sama seperti print
@@ -134,6 +139,7 @@ object EscPosLabel {
             val x0 = ((w - bw) / 2).coerceAtLeast(1)
             // 40x30: tinggi barcode 24% label (sama dgn jalur Code128), bukan sisa ke tepi bawah.
             val hpx = if (big) (h * 0.24f).toInt()
+                      else if (med) (h * 0.225f).toInt()
                       else (h - topBar - (sc * 1f).toInt()).coerceAtLeast(20)
             for (b in Ean13.encodeBars(barcode)) {
                 val xa = x0 + b.xModul * ndot
@@ -143,13 +149,15 @@ object EscPosLabel {
             val bc = Code128.encodeCDigits(barcode) ?: Code128.encodeBText(barcode)
             // Label 40x30 (h>=240): barcode penuh mengisi sisa + nomor barcode di bawah (mirror TSPL).
             val bigL = h >= 240
+            val letakNomor = bigL || med
             // bigL (40x30): barcode 24% tinggi label (cetak 12,8 mm) + nomor di bawahnya.
-            val hpx = if (bigL) (h * 0.24f).toInt() else h - topBar
+            // med (30x20): barcode 22,5% (cetak 4,5 mm) + nomor, sama spt Layout A.
+            val hpx = if (bigL) (h * 0.24f).toInt() else if (med) (h * 0.225f).toInt() else h - topBar
             drawBarcode(c, bc, hpx, topBar, sc, w)
-            if (bigL) {
+            if (letakNomor) {
                 val txt = clipText(barcode, paint, w - (sc * 2))
                 paint.textSize = sc * 0.9f
-                c.drawText(txt, w / 2f, topBar + hpx + (sc * 1.6f), paint)
+                c.drawText(txt, w / 2f, topBar + hpx + (if (med) sc * 1.1f else sc * 1.6f), paint)
             }
         }
         return bmp
@@ -277,6 +285,11 @@ object EscPosLabel {
         // + NOMOR BARCODE dicetak di bawah garis. Ukuran lain (25x15=120, 30x20/40x20=160,
         // 50x25=200) MENJAGA perilaku lama (barH proporsional 44/120) — tak berubah.
         val bigLabel = h >= 240
+        // 30x20 = label "sedang": lebar 240 x tinggi 160 dot. Jalur generik di bawah ini
+        // menaruh barcode proporsional 44/120 dan berhenti di dot 138 → 5-7 mm bawah kosong.
+        // Layout A (disetujui user): nama 1,3-3,2 mm, harga 3,6-7,3 mm, barcode 8,4-12,9 mm,
+        // nomor 13,1-15,0 mm. Hanya 30x20 — 40x20 belum diukur.
+        val medium = !bigLabel && w == 240 && h == 160
         // Spasi teks(harga)↔barcode utk 40x30 = 0,5 cm (40 dot dr bawah harga). Grund gap6 sudah ada di yB,
         // jadi tambah 34 di sini. Ukuran lain (h<240) gap 0 (perilaku lama).
         val bigGap = if (bigLabel) 34 else 0
@@ -289,6 +302,8 @@ object EscPosLabel {
         // 23 char = 186 dot = 23.2 mm). Kalibrasi lama 13 dot/char (dari foto ber-skew) terlalu
         // besar -> nama dipotong 23 char padahal muat ~38 -> info terbuang & "..." muncul cepat.
         val nbNama = if (bigLabel) ((w - 16) / CW_BIG).coerceAtLeast(10) else 0
+        // Jumlah char nama yg muat di 30x20 (font "1" x1, ~10 dot/char terukur).
+        val nbNama30 = if (medium) ((w - 16) / CW_BIG).coerceAtLeast(8) else 0
         // NOTE multi-label (v1.6.11): PER-LABEL job utuh — setiap label = SIZE h + GAP + CLS +
         // isi (TEXT/BARCODE, y TANPA offset, semua dalam kanvas) + PRINT 1,1 + FORFEED <h>.
         //   - per-label SIZE h = kanvas SATU label (aturan TSPL: SIZE = 1 kanvas; zona idx*step
@@ -339,6 +354,25 @@ object EscPosLabel {
                     out.write("BAR 10,${yH2 + fhP + 18},300,2$eol".toByteArray(Charsets.US_ASCII))
                     out.write("BARCODE $bcX,$barY2,\"${barcodeKodeTsp(l.bc)}\",$barH2,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
                     val txt = clipTsp(l.bc, (w / CW_BIG).coerceAtLeast(8))
+                    out.write("TEXT ${centerXTsP(txt.length, 1, w, CW_BIG)},$yTxt2,\"1\",0,1,1,\"$txt\"$eol".toByteArray(Charsets.US_ASCII))
+                } else if (medium) {
+                    // ---- Layout A (30x20): semua baris di-tengah, isi memakai seluruh kanvas 160 dot.
+                    // pm = pengali harga terbesar yg muat (Rp 1.200.000 -> x1, Rp 50.000 -> x2).
+                    val pm = (2 downTo 1).firstOrNull { hTxt.length * CW_BIG * it <= w - 16 } ?: 1
+                    val fhP = CH_BIG * pm
+                    // Glyph font "1" = 10x20 dot, jadi baris terakhir butuh 20 dot: yTxt2 = h-20.
+                    // Name 14..34, harga 38..78 (pm2), barcode 90..138, nomor 140..160 = pas kanvas.
+                    val yNb = 14                               // cetak 1,3 mm dari tepi atas
+                    val yH2 = yNb + CH_BIG + 4                 // 38
+                    val gapBc = 12                             // cetak ~1,1 mm
+                    val barY2 = yH2 + fhP + gapBc
+                    val yTxt2 = h - CH_BIG                     // 140
+                    val barH2 = (yTxt2 - 2 - barY2).coerceAtLeast(24)   // 48 (pm2) / 68 (pm1)
+                    val namaT = clipTsp(l.nama, nbNama30)
+                    val txt = clipTsp(l.bc, nbNama30)
+                    out.write("TEXT ${centerXTsP(namaT.length, 1, w, CW_BIG)},$yNb,\"1\",0,1,1,\"$namaT\"$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("TEXT ${centerXTsP(hTxt.length, pm, w, CW_BIG)},$yH2,\"1\",0,$pm,$pm,\"$hTxt\"$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("BARCODE $bcX,$barY2,\"${barcodeKodeTsp(l.bc)}\",$barH2,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
                     out.write("TEXT ${centerXTsP(txt.length, 1, w, CW_BIG)},$yTxt2,\"1\",0,1,1,\"$txt\"$eol".toByteArray(Charsets.US_ASCII))
                 } else {
                     val xN = 4
