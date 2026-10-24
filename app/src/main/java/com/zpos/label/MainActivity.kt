@@ -1384,7 +1384,7 @@ class MainActivity : AppCompatActivity() {
                     }; return@launch
                 }
             }
-            val bytes = EscPosLabel.buatKalibrasi(paperW, paperH, BuildConfig.VERSION_NAME)
+            val bytes = EscPosLabel.buatKotakUji(paperW, paperH)
             val err = withContext(Dispatchers.IO) { BluetoothPrinter.write(bytes) }
             withContext(Dispatchers.Main) {
                 Toast.makeText(this@MainActivity,

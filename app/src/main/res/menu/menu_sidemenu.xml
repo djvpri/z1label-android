@@ -13,7 +13,7 @@
             android:title="Urutan (Terbaru / A–Z)" />
         <item
             android:id="@+id/menu_calibrate"
-            android:title="Cetak Label Kalibrasi" />
+            android:title="Cetak Kotak Uji 1cm" />
         <item
             android:id="@+id/menu_gapdetect"
             android:title="Deteksi Gap Kertas" />

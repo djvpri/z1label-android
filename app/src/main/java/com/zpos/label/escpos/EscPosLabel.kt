@@ -357,7 +357,7 @@ object EscPosLabel {
         // 40x20 = lebar 40 mm tapi pendek 20 mm. Kanvas 438x219, layout sama pola medium
         // (nama/harga/barcode/nomor) tapi harga boleh x3 karena lebar 438 dot.
         val wide20 = !bigLabel && w == 320 && h == 160
-        // Satu sumber kebenaran: kanvas() dipakai juga oleh buatKalibrasi(), jadi label
+        // Satu sumber kebenaran: kanvas() dipakai juga oleh buatKotakUji(), jadi label
         // kalibrasi & label produk selalu berada di ruang koordinat yang sama.
         val (wC, hC) = kanvas(widthMm, heightMm)
         // Spasi teks(harga)↔barcode utk 40x30 = 0,5 cm (40 dot dr bawah harga). Grund gap6 sudah ada di yB,
@@ -572,7 +572,7 @@ object EscPosLabel {
     }
 
     /** Kanvas perintah (dot) utk ukuran label tertentu — SATU sumber kebenaran, dipakai
-     *  buatRunTSPL & buatKalibrasi supaya angka kalibrasi = angka cetak sebenarnya. */
+     *  buatRunTSPL & buatKotakUji supaya angka uji = angka cetak sebenarnya. */
     fun kanvas(widthMm: Int, heightMm: Int): Pair<Int, Int> {
         val w = (widthMm * DOTS_PER_MM).toInt()
         val h = (heightMm * DOTS_PER_MM).toInt()
@@ -599,41 +599,26 @@ object EscPosLabel {
     }
 
     /**
-     * Label KALIBRASI v3 — geometri DIHITUNG dari kanvas, bukan angka mati.
-     *
-     * v2 gagal: batang vertikal ditaruh di y=160 padahal kanvas cuma 164 tinggi (terpotong),
-     * dan kanvas 274x164 > label 25x15 -> satu PRINT memakan >1 lembar.
-     *
-     * Isi: 3 batang horizontal tinggi 10/20/40 cmd, 3 batang vertikal lebar 10/20/40 cmd,
-     * teks CAL x2. Semua selebar/sepanjang yang muat. Baca pakai penggaris:
-     *   skala = tinggi_terukur_mm * 8 / cmd   (40 cmd = 4,00 mm kalau skala 0,80; 5,00 mm kalau 1:1)
+     * KOTAK UJI 1 cm x 1 cm di pojok kiri-atas kanvas. Satu-satunya isi label, sengaja tanpa
+     * teks: supaya yang diukur cuma kotak. 1 cm pada skala 0,80 = 100 cmd (1 cmd = 0,1 mm).
+     * Cetak -> ukur sisi kotak + jarak ke tepi label -> arah koreksi ditentukan dari situ.
      */
-    fun buatKalibrasi(widthMm: Int, heightMm: Int, versi: String): ByteArray {
+    fun buatKotakUji(widthMm: Int, heightMm: Int): ByteArray {
         val (wC, hC) = kanvas(widthMm, heightMm)
         val out = ByteArrayOutputStream()
         val eol = "\r\n"
         fun bar(x: Int, y: Int, w: Int, h: Int) {
             out.write("BAR $x,$y,$w,$h$eol".toByteArray(Charsets.US_ASCII))
         }
-        fun txt(x: Int, y: Int, mul: Int, t: String) {
-            out.write("TEXT $x,$y,\"1\",0,$mul,$mul,\"$t\"$eol".toByteArray(Charsets.US_ASCII))
-        }
         out.write("SIZE $wC,$hC$eol".toByteArray(Charsets.US_ASCII))
-        out.write("GAP 2,0$eol".toByteArray(Charsets.US_ASCII))   // pitch = tinggi label + 2 mm
+        out.write("GAP 2,0$eol".toByteArray(Charsets.US_ASCII))
         out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
-        // ---- batang horizontal (tinggi = yang diukur), selebar kanvas
-        bar(0, 0, wC, 10)                       // A: 10 cmd
-        bar(0, 20, wC, 20)                      // B: 20 cmd
-        bar(0, 50, wC, 40)                      // C: 40 cmd  (paling tebal)
-        // ---- batang vertikal, tinggi = sisa kanvas (dihitung, bukan 160 mati)
-        val vy = 100
-        val vh = (hC - vy - 2).coerceAtLeast(20)
-        bar(0, vy, 10, vh)                      // D: 10 cmd
-        bar(40, vy, 20, vh)                     // E: 20 cmd
-        bar(90, vy, 40, vh)                     // F: 40 cmd (paling lebar)
-        // ---- teks penanda di kanan (x2 supaya kebaca)
-        txt(140, vy + 2, 2, "CAL $versi")
-        txt(140, vy + 44, 2, "${widthMm}x${heightMm}")
+        val sisi = 100          // 1 cm pada 0,1 mm/cmd
+        val t = 3               // tebal garis, biar kebaca
+        bar(0, 0, sisi, t)                  // atas
+        bar(0, sisi - t, sisi, t)           // bawah
+        bar(0, 0, t, sisi)                  // kiri
+        bar(sisi - t, 0, t, sisi)           // kanan
         out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))
         return out.toByteArray()
     }
