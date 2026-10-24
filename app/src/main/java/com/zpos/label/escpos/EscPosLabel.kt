@@ -576,31 +576,42 @@ object EscPosLabel {
     }
 
     /**
-     * Label KALIBRASI: kotak tepi + tick tiap 40 dot (=5 mm cetak bila skala 1:1) di dalam
-     * kanvas perintah yg sama dgn cetak normal. Scan hasilnya -> skala X, skala Y, dan offset
-     * origin bisa dihitung, bukan ditebak. Cetak 1 label, bukan 5 rilis coba-coba.
+     * Label KALIBRASI v2 — diukur PAKAI PENGGARIS, bukan scan (scan 300 dpi sering
+     * turun resolusi jadi 187 px; tick 2 dot hilang).
+     *
+     * Isi label, dari atas: 3 BAR horizontal tinggi 10 / 20 / 40 cmd, lalu 3 BAR vertikal
+     * lebar 10 / 20 / 40 cmd. Semua selebar/sepanjang kanvas supaya mustahil terlewat.
+     * Dari situ: skala_Y = tinggi_terukur_mm * 8 / cmd, skala_X = lebar_terukur_mm * 8 / cmd.
+     * Kalau 40 cmd terukur 5 mm -> skala 1,0 (printer 1:1). Kalau 3,65 mm -> skala 0,73.
      */
     fun buatKalibrasi(widthMm: Int, heightMm: Int, versi: String): ByteArray {
         val (wC, hC) = kanvas(widthMm, heightMm)
         val out = ByteArrayOutputStream()
         val eol = "\r\n"
-        fun cmd(x: Int, y: Int, w: Int, h: Int) {
+        fun bar(x: Int, y: Int, w: Int, h: Int) {
             out.write("BAR $x,$y,$w,$h$eol".toByteArray(Charsets.US_ASCII))
+        }
+        fun txt(x: Int, y: Int, mul: Int, t: String) {
+            out.write("TEXT $x,$y,\"1\",0,$mul,$mul,\"$t\"$eol".toByteArray(Charsets.US_ASCII))
         }
         out.write("SIZE $wC,$hC$eol".toByteArray(Charsets.US_ASCII))
         out.write("GAP 16,0$eol".toByteArray(Charsets.US_ASCII))
         out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
-        // kotak tepi 2 dot (tepi kanvas = tepi label kalau skala 1:1)
-        cmd(0, 0, wC, 2); cmd(0, hC - 2, wC, 2)
-        cmd(0, 0, 2, hC); cmd(wC - 2, 0, 2, hC)
-        // tick tiap 40 dot sepanjang tepi atas (panjang 14) & tepi kiri (lebar 14)
-        var x = 40
-        while (x < wC - 40) { cmd(x, 2, 2, 14); x += 40 }
-        var y = 40
-        while (y < hC - 40) { cmd(2, y, 14, 2); y += 40 }
-        // teks penanda: versi + kanvas + ukuran fisik (angka yg harus dibandingkan dgn penggaris)
-        out.write("TEXT 20,40,\"1\",0,1,1,\"CAL $versi\"$eol".toByteArray(Charsets.US_ASCII))
-        out.write("TEXT 20,62,\"1\",0,1,1,\"${widthMm}x${heightMm}MM ${wC}.${hC}\"$eol".toByteArray(Charsets.US_ASCII))
+        // --- batang horizontal: tinggi 10 / 20 / 40 cmd, tiap batang selebar kanvas
+        val hx = 0
+        val hw = wC
+        bar(hx, 0, hw, 10)                       // A: 10 cmd
+        bar(hx, 50, hw, 20)                      // B: 20 cmd
+        bar(hx, 110, hw, 40)                     // C: 40 cmd
+        // --- batang vertikal: lebar 10 / 20 / 40 cmd, setinggi sisa kanvas
+        val vy = 160
+        val vh = (hC - vy - 2).coerceAtLeast(40)
+        bar(0, vy, 10, vh)                       // D: 10 cmd
+        bar(60, vy, 20, vh)                      // E: 20 cmd
+        bar(130, vy, 40, vh)                     // F: 40 cmd
+        // teks besar (x2) supaya masih kebaca walau di-downscale
+        txt(190, vy + 4, 2, "CAL $versi")
+        txt(190, vy + 50, 2, "${widthMm}x${heightMm}")
         out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))
         out.write("FORFEED $hC$eol".toByteArray(Charsets.US_ASCII))
         return out.toByteArray()
