@@ -203,8 +203,8 @@ class MainActivity : AppCompatActivity() {
         b.btnPrinter.setOnClickListener { pilihPrinter() }
         b.btnSort.setOnClickListener { pilihSort() }
         b.btnPaper.setOnClickListener { pilihKertas() }
-        // Tekan-lama tombol Kertas = cetak label KALIBRASI (kotak tepi + tick 5 mm).
-        // Tujuan: ukur skala X/Y & offset printer dari satu scan, bukan menebak.
+        // Catatan: btnPaper ber-visibility=gone di activity_main.xml, jadi tekan-lama di sini
+        // TIDAK pernah kena tap user. Jalur kalibrasi yg benar = menu drawer "Cetak Label Kalibrasi".
         b.btnPaper.setOnLongClickListener {
             cetakKalibrasi()
             true
@@ -229,6 +229,7 @@ class MainActivity : AppCompatActivity() {
             when (item.itemId) {
                 com.zpos.label.R.id.menu_printer -> pilihPrinter()
                 com.zpos.label.R.id.menu_kertas -> pilihKertas()
+                com.zpos.label.R.id.menu_calibrate -> cetakKalibrasi()
                 com.zpos.label.R.id.menu_sort -> pilihSort()
                 com.zpos.label.R.id.menu_proto -> toggleProto()
                 com.zpos.label.R.id.menu_font -> toggleFont()
