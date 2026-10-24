@@ -46,9 +46,14 @@ object EscPosLabel {
     // Kanvas perintah utk label 50x25: 50 mm / 0,73 x 8 = 548 dot.
     private const val WIDE_W = 548
     private const val WIDE_H = 274
-    // Kanvas perintah utk label 25x15: 25 mm / 0,73 x 8 = 274 dot, 15 mm / 0,73 x 8 = 164 dot.
-    private const val SMALL_W = 274
-    private const val SMALL_H = 164
+    // SKALA CETAK TERUKUR (penggaris, label kalibrasi v1.8.13 pada printer user):
+    //   batang 10 cmd -> 1,0 mm dan 40 cmd -> 4,0 mm  =>  0,100 mm/cmd  =>  skala 0,80.
+    // Konfirmasi silang: kanvas lama 274 dot utk label 25 mm TERPOTONG di tepi kanan
+    // (274 x 0,73 = 25,0 mm pas; 274 x 0,80 = 27,4 mm -> lebih 2,4 mm). Jadi 0,73 salah.
+    private const val PRINT_SCALE = 0.80
+    /** Kanvas perintah (dot) = mm x 8 / PRINT_SCALE. Utk 25x15 -> 250x150. */
+    private const val SMALL_W = 250
+    private const val SMALL_H = 150
     // Kanvas perintah utk label 40x20: 40 mm / 0,73 x 8 = 438 dot, 20 mm / 0,73 x 8 = 219 dot.
     private const val W20_W = 438
     private const val W20_H = 219
@@ -132,13 +137,13 @@ object EscPosLabel {
         val yNama = if (big) h * 0.062f
                     else if (med) h * 0.155f
                     else if (wide) h * 0.083f
-                    else if (small) h * 0.075f
+                    else if (small) h * 0.053f
                     else if (w20) h * 0.064f
                     else sc * 3f
         val yHarga = if (big) h * 0.335f
                      else if (med) h * 0.355f
                      else if (wide) h * 0.35f
-                     else if (small) h * 0.30f
+                     else if (small) h * 0.213f
                      else if (w20) h * 0.173f
                      else sc * 7.4f
         paint.textSize = sc * 2.2f
@@ -150,7 +155,7 @@ object EscPosLabel {
         val topBar = if (big) (h * 0.445f).toInt()
                      else if (med) (h * 0.42f).toInt()
                      else if (wide) (h * 0.533f).toInt()
-                     else if (small) (h * 0.532f).toInt()
+                     else if (small) (h * 0.56f).toInt()
                      else if (w20) (h * 0.493f).toInt()
                      else (h - (sc * 8.4f)).toInt().coerceAtLeast(30)
         if (wide) {
@@ -197,7 +202,7 @@ object EscPosLabel {
             val hpx = if (bigL) (h * 0.24f).toInt()
                       else if (med) (h * 0.365f).toInt()
                       else if (wide) (h * 0.30f).toInt()
-                      else if (small) (h * 0.30f).toInt()
+                      else if (small) (h * 0.267f).toInt()
                       else if (w20) (h * 0.319f).toInt()
                       else h - topBar
             drawBarcode(c, bc, hpx, topBar, sc, w)
@@ -445,15 +450,15 @@ object EscPosLabel {
                     out.write("BARCODE $bcX,$barY2,\"${barcodeKodeTsp(l.bc)}\",$barH2,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
                     out.write("TEXT ${centerXTsP(txt.length, 1, wC, CW_BIG)},$yTxt2,\"1\",0,1,1,\"$txt\"$eol".toByteArray(Charsets.US_ASCII))
                 } else if (small) {
-                    // ---- Desain A (25x15) di kanvas 274x164: nama, harga x2, barcode, nomor.
-                    // Target cetak: nama 0,73-2,55 / harga 2,92-6,57 / barcode 7,30-11,86 / nomor 12,23-14,05
+                    // ---- Desain A (25x15) di kanvas 250x150 (skala 0,80 TERUKUR): 0,1 mm per cmd.
+                    // Cetak: nama 0,80-2,80 / harga 3,20-7,20 / barcode 7,80-11,80 / nomor 12,20-14,20
                     val pm = (2 downTo 1).firstOrNull { hTxt.length * CW_BIG * it <= wC - 20 } ?: 1
                     val fhP = CH_BIG * pm                      // 40 (pm2) / 20 (pm1)
-                    val yNb = 8                                // cetak 0,73 mm
-                    val yH2 = 32                               // cetak 2,92 mm
-                    val barY2 = 80                             // cetak 7,30 mm
-                    val barH2 = 50                             // cetak 4,56 mm
-                    val yTxt2 = 134                            // cetak 12,23-14,05 mm, sisa 0,91 mm
+                    val yNb = 8                                // cetak 0,80 mm
+                    val yH2 = 32                               // cetak 3,20 mm
+                    val barY2 = 78                             // cetak 7,80 mm
+                    val barH2 = 40                             // cetak 4,00 mm
+                    val yTxt2 = 122                            // cetak 12,20-14,20 mm, sisa 0,80 mm
                     val namaT = clipTsp(l.nama, nbNama25)
                     val txt = clipTsp(l.bc, nbNama25)
                     out.write("TEXT ${centerXTsP(namaT.length, 1, wC, CW_BIG)},$yNb,\"1\",0,1,1,\"$namaT\"$eol".toByteArray(Charsets.US_ASCII))
@@ -552,7 +557,7 @@ object EscPosLabel {
         // Di kanvas perintah (skala 0,73) itu berarti n >= ceil(0,25*8/0,73) = 3.
         // Tanpa batas bawah ini, label 25x15 memberi n=2 -> modul 0,182 mm = tak terbaca.
         val nQuiet = wCmd / (total + 2 * quiet)
-        val nMin = ceil(0.25 * DOTS_PER_MM / TSPL_BC_SCALE).toInt()   // 3
+        val nMin = ceil(0.25 * DOTS_PER_MM / PRINT_SCALE).toInt()     // 3 (modul >= 0,25 mm)
         val nMax = ((wCmd - 2) / total).coerceAtLeast(1)                          // simbol harus muat
         val n = nQuiet.coerceAtLeast(nMin).coerceAtMost(nMax).coerceIn(1, 5)
         val x = ((wCmd - total * n) / 2).coerceAtLeast(1)
@@ -576,13 +581,14 @@ object EscPosLabel {
     }
 
     /**
-     * Label KALIBRASI v2 — diukur PAKAI PENGGARIS, bukan scan (scan 300 dpi sering
-     * turun resolusi jadi 187 px; tick 2 dot hilang).
+     * Label KALIBRASI v3 — geometri DIHITUNG dari kanvas, bukan angka mati.
      *
-     * Isi label, dari atas: 3 BAR horizontal tinggi 10 / 20 / 40 cmd, lalu 3 BAR vertikal
-     * lebar 10 / 20 / 40 cmd. Semua selebar/sepanjang kanvas supaya mustahil terlewat.
-     * Dari situ: skala_Y = tinggi_terukur_mm * 8 / cmd, skala_X = lebar_terukur_mm * 8 / cmd.
-     * Kalau 40 cmd terukur 5 mm -> skala 1,0 (printer 1:1). Kalau 3,65 mm -> skala 0,73.
+     * v2 gagal: batang vertikal ditaruh di y=160 padahal kanvas cuma 164 tinggi (terpotong),
+     * dan kanvas 274x164 > label 25x15 -> satu PRINT memakan >1 lembar.
+     *
+     * Isi: 3 batang horizontal tinggi 10/20/40 cmd, 3 batang vertikal lebar 10/20/40 cmd,
+     * teks CAL x2. Semua selebar/sepanjang yang muat. Baca pakai penggaris:
+     *   skala = tinggi_terukur_mm * 8 / cmd   (40 cmd = 4,00 mm kalau skala 0,80; 5,00 mm kalau 1:1)
      */
     fun buatKalibrasi(widthMm: Int, heightMm: Int, versi: String): ByteArray {
         val (wC, hC) = kanvas(widthMm, heightMm)
@@ -597,21 +603,19 @@ object EscPosLabel {
         out.write("SIZE $wC,$hC$eol".toByteArray(Charsets.US_ASCII))
         out.write("GAP 16,0$eol".toByteArray(Charsets.US_ASCII))
         out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
-        // --- batang horizontal: tinggi 10 / 20 / 40 cmd, tiap batang selebar kanvas
-        val hx = 0
-        val hw = wC
-        bar(hx, 0, hw, 10)                       // A: 10 cmd
-        bar(hx, 50, hw, 20)                      // B: 20 cmd
-        bar(hx, 110, hw, 40)                     // C: 40 cmd
-        // --- batang vertikal: lebar 10 / 20 / 40 cmd, setinggi sisa kanvas
-        val vy = 160
-        val vh = (hC - vy - 2).coerceAtLeast(40)
-        bar(0, vy, 10, vh)                       // D: 10 cmd
-        bar(60, vy, 20, vh)                      // E: 20 cmd
-        bar(130, vy, 40, vh)                     // F: 40 cmd
-        // teks besar (x2) supaya masih kebaca walau di-downscale
-        txt(190, vy + 4, 2, "CAL $versi")
-        txt(190, vy + 50, 2, "${widthMm}x${heightMm}")
+        // ---- batang horizontal (tinggi = yang diukur), selebar kanvas
+        bar(0, 0, wC, 10)                       // A: 10 cmd
+        bar(0, 20, wC, 20)                      // B: 20 cmd
+        bar(0, 50, wC, 40)                      // C: 40 cmd  (paling tebal)
+        // ---- batang vertikal, tinggi = sisa kanvas (dihitung, bukan 160 mati)
+        val vy = 100
+        val vh = (hC - vy - 2).coerceAtLeast(20)
+        bar(0, vy, 10, vh)                      // D: 10 cmd
+        bar(40, vy, 20, vh)                     // E: 20 cmd
+        bar(90, vy, 40, vh)                     // F: 40 cmd (paling lebar)
+        // ---- teks penanda di kanan (x2 supaya kebaca)
+        txt(140, vy + 2, 2, "CAL $versi")
+        txt(140, vy + 44, 2, "${widthMm}x${heightMm}")
         out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))
         out.write("FORFEED $hC$eol".toByteArray(Charsets.US_ASCII))
         return out.toByteArray()
