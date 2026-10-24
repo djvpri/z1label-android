@@ -469,19 +469,20 @@ object EscPosLabel {
                     // Tinggi 80 cmd tidak cukup utk 4 baris (nama 20 + harga x2 40 + barcode
                     // 20 + nomor 20 = 100), jadi 3 baris: nama x1 / harga x2 / barcode.
                     // Cetak: nama 0,0-2,0 / harga 2,0-6,0 / barcode 6,0-8,0 mm.
-                    // Arahan user: harga turun 0,1 cm (10 cmd), barcode turun 0,1 cm (10 cmd),
-                    // barcode dilebarkan 0,2 cm (20 cmd). Boleh melewati kotak 80 cmd.
+                    // Arahan user: SEMUA naik 10 cmd (nama, harga, barcode).
+                    // Riwayat: harga & barcode turun 10, barcode dilebarkan 20 (SMALL_BW).
                     val pm = (2 downTo 1).firstOrNull { hTxt.length * CW_BIG * it <= SMALL_AW - 4 } ?: 1
                     val fhP = CH_BIG * pm                      // 40 (pm2) / 20 (pm1)
-                    val yNb = SMALL_Y0                         // 0    -> 0,00 mm
-                    val yH2 = yNb + CH_BIG + 10                // 30   -> 3,00 mm (turun 0,1 cm)
-                    val barY2 = yH2 + fhP + 10                 // 70/80 -> 7,00 mm (turun 0,1 cm)
-                    val barH2 = 20                             // 2,00 mm; ujung 90 cmd (boleh lewat)
+                    val yNb = SMALL_Y0 - 10                    // -10: mentok atas, dijepit di bawah
+                    val yN = yNb.coerceAtLeast(0)              // 0 cmd (tak bisa negatif)
+                    val yH2 = yN + CH_BIG                      // 20   -> 2,00 mm
+                    val barY2 = yH2 + fhP + 10                 // 70/60 -> 7,00 / 6,00 mm
+                    val barH2 = 20                             // 2,00 mm
                     val namaT = clipTsp(l.nama, SMALL_AW / CW_BIG)
                     val xNama = SMALL_X0 + centerXTsP(namaT.length, 1, SMALL_AW, CW_BIG)
                     val xHarga = SMALL_X0 + centerXTsP(hTxt.length, pm, SMALL_AW, CW_BIG)
                     val (bcXa, bcNa) = barcodeGeoCmd(l.bc, SMALL_BW)
-                    out.write("TEXT $xNama,$yNb,\"1\",0,1,1,\"$namaT\"$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("TEXT $xNama,$yN,\"1\",0,1,1,\"$namaT\"$eol".toByteArray(Charsets.US_ASCII))
                     out.write("TEXT $xHarga,$yH2,\"1\",0,$pm,$pm,\"$hTxt\"$eol".toByteArray(Charsets.US_ASCII))
                     out.write("BARCODE ${SMALL_X0 + bcXa},$barY2,\"${barcodeKodeTsp(l.bc)}\",$barH2,0,0,$bcNa,$bcNa,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
                 } else if (wide) {
