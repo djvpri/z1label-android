@@ -469,13 +469,14 @@ object EscPosLabel {
                     // Tinggi 80 cmd tidak cukup utk 4 baris (nama 20 + harga x2 40 + barcode
                     // 20 + nomor 20 = 100), jadi 3 baris: nama x1 / harga x2 / barcode.
                     // Cetak: nama 0,0-2,0 / harga 2,0-6,0 / barcode 6,0-8,0 mm.
-                    // Arahan user: SEMUA naik 10 cmd (nama, harga, barcode).
-                    // Riwayat: harga & barcode turun 10, barcode dilebarkan 20 (SMALL_BW).
+                    // Geser KANVAS 10 cmd: origin TSPL selalu (0,0), jadi menggeser kanvas =
+                    // mengurangi semua y sebesar 10. Nama sudah di y=0 -> tidak bisa ikut naik
+                    // (y negatif tidak dicetak). Jadi kanvas digeser utk baris yang punya ruang:
+                    // nama tetap, harga & barcode naik 1 mm dari posisi v1.8.25.
                     val pm = (2 downTo 1).firstOrNull { hTxt.length * CW_BIG * it <= SMALL_AW - 4 } ?: 1
                     val fhP = CH_BIG * pm                      // 40 (pm2) / 20 (pm1)
-                    val yNb = SMALL_Y0 - 10                    // -10: mentok atas, dijepit di bawah
-                    val yN = yNb.coerceAtLeast(0)              // 0 cmd (tak bisa negatif)
-                    val yH2 = yN + CH_BIG                      // 20   -> 2,00 mm
+                    val yN = 0                                 // nama: tepi atas kanvas (mentok)
+                    val yH2 = yN + CH_BIG                      // 20 -> 2,00 mm
                     val barY2 = yH2 + fhP + 10                 // 70/60 -> 7,00 / 6,00 mm
                     val barH2 = 20                             // 2,00 mm
                     val namaT = clipTsp(l.nama, SMALL_AW / CW_BIG)
