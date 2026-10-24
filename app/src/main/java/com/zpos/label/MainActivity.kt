@@ -203,6 +203,12 @@ class MainActivity : AppCompatActivity() {
         b.btnPrinter.setOnClickListener { pilihPrinter() }
         b.btnSort.setOnClickListener { pilihSort() }
         b.btnPaper.setOnClickListener { pilihKertas() }
+        // Tekan-lama tombol Kertas = cetak label KALIBRASI (kotak tepi + tick 5 mm).
+        // Tujuan: ukur skala X/Y & offset printer dari satu scan, bukan menebak.
+        b.btnPaper.setOnLongClickListener {
+            cetakKalibrasi()
+            true
+        }
         b.btnProto.setOnClickListener { toggleProto() }
         b.btnFont.setOnClickListener { toggleFont() }
         b.btnBarcode.setOnClickListener { toggleBarcode() }
@@ -1335,6 +1341,31 @@ class MainActivity : AppCompatActivity() {
         }
         if (!needsConnect || !ask) Logger.log(this, "bt", "bluetooth ok -> buka dialog printer")
         return true
+    }
+
+    /** Cetak 1 label kalibrasi (TSPL). Tekan-lama tombol "Kertas". */
+    private fun cetakKalibrasi() {
+        val addr = printerAddress ?: run {
+            Toast.makeText(this, "Pilih printer dulu", Toast.LENGTH_SHORT).show(); return
+        }
+        if (!bluetoothOk(true)) return
+        scope.launch {
+            if (!BluetoothPrinter.connected()) {
+                val err = withContext(Dispatchers.IO) { BluetoothPrinter.connect(addr) }
+                if (err != null) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, "Gagal konek: $err", Toast.LENGTH_LONG).show()
+                    }; return@launch
+                }
+            }
+            val bytes = EscPosLabel.buatKalibrasi(paperW, paperH, BuildConfig.VERSION_NAME)
+            val err = withContext(Dispatchers.IO) { BluetoothPrinter.write(bytes) }
+            withContext(Dispatchers.Main) {
+                Toast.makeText(this@MainActivity,
+                    if (err == null) "Label kalibrasi ${paperW}x${paperH} terkirim" else "Gagal: $err",
+                    Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private fun cetak() {

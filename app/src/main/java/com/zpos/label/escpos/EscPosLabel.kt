@@ -352,10 +352,9 @@ object EscPosLabel {
         // 40x20 = lebar 40 mm tapi pendek 20 mm. Kanvas 438x219, layout sama pola medium
         // (nama/harga/barcode/nomor) tapi harga boleh x3 karena lebar 438 dot.
         val wide20 = !bigLabel && w == 320 && h == 160
-        val wC = if (wide) WIDE_W else if (medium) MED_W else if (wide20) W20_W
-                 else if (small) SMALL_W else w
-        val hC = if (wide) WIDE_H else if (medium) MED_H else if (wide20) W20_H
-                 else if (small) SMALL_H else h
+        // Satu sumber kebenaran: kanvas() dipakai juga oleh buatKalibrasi(), jadi label
+        // kalibrasi & label produk selalu berada di ruang koordinat yang sama.
+        val (wC, hC) = kanvas(widthMm, heightMm)
         // Spasi teks(harga)↔barcode utk 40x30 = 0,5 cm (40 dot dr bawah harga). Grund gap6 sudah ada di yB,
         // jadi tambah 34 di sini. Ukuran lain (h<240) gap 0 (perilaku lama).
         val bigGap = if (bigLabel) 34 else 0
@@ -558,6 +557,53 @@ object EscPosLabel {
         val n = nQuiet.coerceAtLeast(nMin).coerceAtMost(nMax).coerceIn(1, 5)
         val x = ((wCmd - total * n) / 2).coerceAtLeast(1)
         return x to n
+    }
+
+    /** Kanvas perintah (dot) utk ukuran label tertentu — SATU sumber kebenaran, dipakai
+     *  buatRunTSPL & buatKalibrasi supaya angka kalibrasi = angka cetak sebenarnya. */
+    fun kanvas(widthMm: Int, heightMm: Int): Pair<Int, Int> {
+        val w = (widthMm * DOTS_PER_MM).toInt()
+        val h = (heightMm * DOTS_PER_MM).toInt()
+        val big = h >= 240
+        return when {
+            big -> w to h                                                   // 40x30: 1:1 + lead
+            w == 400 && h == 200 -> WIDE_W to WIDE_H                        // 50x25
+            w == 240 && h == 160 -> MED_W to MED_H                          // 30x20
+            w == 320 && h == 160 -> W20_W to W20_H                          // 40x20
+            w == 200 && h == 120 -> SMALL_W to SMALL_H                      // 25x15
+            else -> w to h
+        }
+    }
+
+    /**
+     * Label KALIBRASI: kotak tepi + tick tiap 40 dot (=5 mm cetak bila skala 1:1) di dalam
+     * kanvas perintah yg sama dgn cetak normal. Scan hasilnya -> skala X, skala Y, dan offset
+     * origin bisa dihitung, bukan ditebak. Cetak 1 label, bukan 5 rilis coba-coba.
+     */
+    fun buatKalibrasi(widthMm: Int, heightMm: Int, versi: String): ByteArray {
+        val (wC, hC) = kanvas(widthMm, heightMm)
+        val out = ByteArrayOutputStream()
+        val eol = "\r\n"
+        fun cmd(x: Int, y: Int, w: Int, h: Int) {
+            out.write("BAR $x,$y,$w,$h$eol".toByteArray(Charsets.US_ASCII))
+        }
+        out.write("SIZE $wC,$hC$eol".toByteArray(Charsets.US_ASCII))
+        out.write("GAP 16,0$eol".toByteArray(Charsets.US_ASCII))
+        out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
+        // kotak tepi 2 dot (tepi kanvas = tepi label kalau skala 1:1)
+        cmd(0, 0, wC, 2); cmd(0, hC - 2, wC, 2)
+        cmd(0, 0, 2, hC); cmd(wC - 2, 0, 2, hC)
+        // tick tiap 40 dot sepanjang tepi atas (panjang 14) & tepi kiri (lebar 14)
+        var x = 40
+        while (x < wC - 40) { cmd(x, 2, 2, 14); x += 40 }
+        var y = 40
+        while (y < hC - 40) { cmd(2, y, 14, 2); y += 40 }
+        // teks penanda: versi + kanvas + ukuran fisik (angka yg harus dibandingkan dgn penggaris)
+        out.write("TEXT 20,40,\"1\",0,1,1,\"CAL $versi\"$eol".toByteArray(Charsets.US_ASCII))
+        out.write("TEXT 20,62,\"1\",0,1,1,\"${widthMm}x${heightMm}MM ${wC}.${hC}\"$eol".toByteArray(Charsets.US_ASCII))
+        out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))
+        out.write("FORFEED $hC$eol".toByteArray(Charsets.US_ASCII))
+        return out.toByteArray()
     }
 
     /**
