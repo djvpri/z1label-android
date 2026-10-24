@@ -392,7 +392,10 @@ object EscPosLabel {
             // Harga 40x30 sudah dibersihkan & titik-ribuan dipasang ulang (sanitizeTsp asli membuang '.')
             val hRibu = if (bigLabel || wide || small || wide20) hargaTsp(l.harga, 24) else l.harga
             out.write("SIZE $wC,$hC$eol".toByteArray(Charsets.US_ASCII))
-            out.write("GAP 16,0$eol".toByteArray(Charsets.US_ASCII))
+            // GAP = jarak fisik antar label (mm, dot). 16 mm itu SALAH untuk label 25x15:
+            // pitch jadi 15+16=31 mm -> feed lari ke label berikutnya. Pakai gap pendek 2 mm
+            // supaya pitch = tinggi label + 2.
+            out.write("GAP ${if (bigLabel) "16,0" else "2,0"}$eol".toByteArray(Charsets.US_ASCII))
             out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
             if (barcode2d) {
                 val (mQ, xQ) = qrGeo(l.bc, w, h, barY)
@@ -512,7 +515,11 @@ object EscPosLabel {
                 }
             }
             out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))
-            out.write("FORFEED $hC$eol".toByteArray(Charsets.US_ASCII))   // maju tepat 1 label
+            // FORFEED hanya untuk 40x30 (kanvas = ukuran fisik, jalur bigLabel). Ukuran lain
+            // memakai kanvas perintah yg lebih besar dari label -> FORFEED menambah feed dan
+            // membuat 1x cetak menghabiskan >1 lembar. Terukur 25x15: SIZE 150 + GAP 16 +
+            // FORFEED 150 = 46 mm = 3 lembar untuk 1 label.
+            if (bigLabel) out.write("FORFEED $hC$eol".toByteArray(Charsets.US_ASCII))
         }
         return out.toByteArray()
     }
@@ -612,7 +619,7 @@ object EscPosLabel {
             out.write("TEXT $x,$y,\"1\",0,$mul,$mul,\"$t\"$eol".toByteArray(Charsets.US_ASCII))
         }
         out.write("SIZE $wC,$hC$eol".toByteArray(Charsets.US_ASCII))
-        out.write("GAP 16,0$eol".toByteArray(Charsets.US_ASCII))
+        out.write("GAP 2,0$eol".toByteArray(Charsets.US_ASCII))   // pitch = tinggi label + 2 mm
         out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
         // ---- batang horizontal (tinggi = yang diukur), selebar kanvas
         bar(0, 0, wC, 10)                       // A: 10 cmd
@@ -628,7 +635,6 @@ object EscPosLabel {
         txt(140, vy + 2, 2, "CAL $versi")
         txt(140, vy + 44, 2, "${widthMm}x${heightMm}")
         out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))
-        out.write("FORFEED $hC$eol".toByteArray(Charsets.US_ASCII))
         return out.toByteArray()
     }
 
