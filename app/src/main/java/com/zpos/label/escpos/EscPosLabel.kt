@@ -605,7 +605,7 @@ object EscPosLabel {
      */
     fun buatKotakUji(widthMm: Int, heightMm: Int): ByteArray {
         val (wC, hC) = kanvas(widthMm, heightMm)
-        // Arahan user: kotak harus digeser 3,6 cm (=36 mm) ke kanan. 1 cmd = 0,1 mm -> 360 cmd.
+        // Arahan user (dihitung dari sudut a): geser ke KIRI 2,1 cm = 210 cmd (1 cmd = 0,1 mm).
         // Kanvas diperlebar supaya x offset + kotak masih di dalam SIZE (kalau x > SIZE, dipotong).
         val geserX = 360
         val lebarKanvas = wC + geserX
@@ -619,7 +619,8 @@ object EscPosLabel {
         out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
         val sisi = 100          // 1 cm pada 0,1 mm/cmd
         val t = 3               // tebal garis, biar kebaca
-        val x0 = geserX          // kotak mulai di x = 360 cmd (3,6 cm dari kiri kanvas)
+        // x0 = 360 (geser kanan sebelumnya) - 210 (geser kiri dari sudut a) = 150 cmd
+        val x0 = geserX - 210
         bar(x0, 0, sisi, t)                  // atas
         bar(x0, sisi - t, sisi, t)           // bawah
         bar(x0, 0, t, sisi)                  // kiri
