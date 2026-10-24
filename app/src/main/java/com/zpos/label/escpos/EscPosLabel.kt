@@ -619,6 +619,15 @@ object EscPosLabel {
         bar(0, sisi - t, sisi, t)           // bawah
         bar(0, 0, t, sisi)                  // kiri
         bar(sisi - t, 0, t, sisi)           // kanan
+        // Huruf kecil (font "1" x1 = ~8x20 cmd = ~0,8 x 2 mm) di tiap sudut, di DALAM kotak:
+        // a=kiri-atas, b=kanan-atas, c=kiri-bawah, d=kanan-bawah. Patokan arah koreksi.
+        fun txt(x: Int, y: Int, v: String) {
+            out.write("TEXT $x,$y,\"1\",0,1,1,\"$v\"$eol".toByteArray(Charsets.US_ASCII))
+        }
+        txt(t + 6, t + 4, "a")
+        txt(sisi - 22, t + 4, "b")
+        txt(t + 6, sisi - 26, "c")
+        txt(sisi - 22, sisi - 26, "d")
         out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))
         return out.toByteArray()
     }
