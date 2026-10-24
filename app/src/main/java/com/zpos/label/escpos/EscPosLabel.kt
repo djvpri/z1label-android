@@ -581,6 +581,17 @@ object EscPosLabel {
     }
 
     /**
+     * Perintah DETEKSI GAP / panjang label. Dipakai kalau 1x PRINT menghabiskan >1 lembar:
+     * artinya printer belum tahu pitch label (dia feed ke posisi gap yg salah).
+     * TSPL: `GAPDETECT` = ukur jarak gap; `SET GAP` = setel sensor gap; `AUTODETECT` cadangan.
+     * Tidak mengubah layout apa pun — hanya menyuruh printer mengukur kertasnya sendiri.
+     */
+    fun buatGapDetect(): ByteArray {
+        val eol = "\r\n"
+        return ("SET GAP 16,0$eol" + "GAPDETECT$eol" + "AUTODETECT$eol").toByteArray(Charsets.US_ASCII)
+    }
+
+    /**
      * Label KALIBRASI v3 — geometri DIHITUNG dari kanvas, bukan angka mati.
      *
      * v2 gagal: batang vertikal ditaruh di y=160 padahal kanvas cuma 164 tinggi (terpotong),

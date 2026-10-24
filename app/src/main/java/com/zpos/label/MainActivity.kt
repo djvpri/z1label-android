@@ -230,6 +230,7 @@ class MainActivity : AppCompatActivity() {
                 com.zpos.label.R.id.menu_printer -> pilihPrinter()
                 com.zpos.label.R.id.menu_kertas -> pilihKertas()
                 com.zpos.label.R.id.menu_calibrate -> cetakKalibrasi()
+                com.zpos.label.R.id.menu_gapdetect -> deteksiGap()
                 com.zpos.label.R.id.menu_sort -> pilihSort()
                 com.zpos.label.R.id.menu_proto -> toggleProto()
                 com.zpos.label.R.id.menu_font -> toggleFont()
@@ -1342,6 +1343,30 @@ class MainActivity : AppCompatActivity() {
         }
         if (!needsConnect || !ask) Logger.log(this, "bt", "bluetooth ok -> buka dialog printer")
         return true
+    }
+
+    /** Deteksi gap kertas: 1x PRINT jangan sampai makan >1 lembar kalau pitch label salah. */
+    private fun deteksiGap() {
+        val addr = printerAddress ?: run {
+            Toast.makeText(this, "Pilih printer dulu", Toast.LENGTH_SHORT).show(); return
+        }
+        if (!bluetoothOk(true)) return
+        scope.launch {
+            if (!BluetoothPrinter.connected()) {
+                val err = withContext(Dispatchers.IO) { BluetoothPrinter.connect(addr) }
+                if (err != null) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, "Gagal konek: $err", Toast.LENGTH_LONG).show()
+                    }; return@launch
+                }
+            }
+            val err = withContext(Dispatchers.IO) { BluetoothPrinter.write(EscPosLabel.buatGapDetect()) }
+            withContext(Dispatchers.Main) {
+                Toast.makeText(this@MainActivity,
+                    if (err == null) "Deteksi gap dikirim - printer akan feed 2-3 lembar sendiri"
+                    else "Gagal: $err", Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     /** Cetak 1 label kalibrasi (TSPL). Tekan-lama tombol "Kertas". */
