@@ -605,29 +605,34 @@ object EscPosLabel {
      */
     fun buatKotakUji(widthMm: Int, heightMm: Int): ByteArray {
         val (wC, hC) = kanvas(widthMm, heightMm)
+        // Arahan user: kotak harus digeser 3,6 cm (=36 mm) ke kanan. 1 cmd = 0,1 mm -> 360 cmd.
+        // Kanvas diperlebar supaya x offset + kotak masih di dalam SIZE (kalau x > SIZE, dipotong).
+        val geserX = 360
+        val lebarKanvas = wC + geserX
         val out = ByteArrayOutputStream()
         val eol = "\r\n"
         fun bar(x: Int, y: Int, w: Int, h: Int) {
             out.write("BAR $x,$y,$w,$h$eol".toByteArray(Charsets.US_ASCII))
         }
-        out.write("SIZE $wC,$hC$eol".toByteArray(Charsets.US_ASCII))
+        out.write("SIZE $lebarKanvas,$hC$eol".toByteArray(Charsets.US_ASCII))
         out.write("GAP 2,0$eol".toByteArray(Charsets.US_ASCII))
         out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
         val sisi = 100          // 1 cm pada 0,1 mm/cmd
         val t = 3               // tebal garis, biar kebaca
-        bar(0, 0, sisi, t)                  // atas
-        bar(0, sisi - t, sisi, t)           // bawah
-        bar(0, 0, t, sisi)                  // kiri
-        bar(sisi - t, 0, t, sisi)           // kanan
+        val x0 = geserX          // kotak mulai di x = 360 cmd (3,6 cm dari kiri kanvas)
+        bar(x0, 0, sisi, t)                  // atas
+        bar(x0, sisi - t, sisi, t)           // bawah
+        bar(x0, 0, t, sisi)                  // kiri
+        bar(x0 + sisi - t, 0, t, sisi)       // kanan
         // Huruf kecil (font "1" x1 = ~8x20 cmd = ~0,8 x 2 mm) di tiap sudut, di DALAM kotak:
         // a=kiri-atas, b=kanan-atas, c=kiri-bawah, d=kanan-bawah. Patokan arah koreksi.
         fun txt(x: Int, y: Int, v: String) {
             out.write("TEXT $x,$y,\"1\",0,1,1,\"$v\"$eol".toByteArray(Charsets.US_ASCII))
         }
-        txt(t + 6, t + 4, "a")
-        txt(sisi - 22, t + 4, "b")
-        txt(t + 6, sisi - 26, "c")
-        txt(sisi - 22, sisi - 26, "d")
+        txt(x0 + t + 6, t + 4, "a")
+        txt(x0 + sisi - 22, t + 4, "b")
+        txt(x0 + t + 6, sisi - 26, "c")
+        txt(x0 + sisi - 22, sisi - 26, "d")
         out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))
         return out.toByteArray()
     }
