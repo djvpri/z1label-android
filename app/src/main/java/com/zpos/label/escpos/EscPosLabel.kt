@@ -51,9 +51,17 @@ object EscPosLabel {
     // Konfirmasi silang: kanvas lama 274 dot utk label 25 mm TERPOTONG di tepi kanan
     // (274 x 0,73 = 25,0 mm pas; 274 x 0,80 = 27,4 mm -> lebih 2,4 mm). Jadi 0,73 salah.
     private const val PRINT_SCALE = 0.80
-    /** Kanvas perintah (dot) = mm x 8 / PRINT_SCALE. Utk 25x15 -> 250x150. */
-    private const val SMALL_W = 250
-    private const val SMALL_H = 150
+    /**
+     * 25x15: area cetak efektif TERUKUR lewat kotak uji (bukan tebakan).
+     * Disetujui user dari penggaris: area 150x80 cmd (15,0 x 8,0 mm) di offset x=200, y=0,
+     * di dalam SIZE 610x150 (geometri yg sama dgn kotak uji v1.8.23 yg posisinya "sempurna").
+     */
+    private const val SMALL_X0 = 200          // offset kiri area cetak (cmd)
+    private const val SMALL_Y0 = 0
+    private const val SMALL_AW = 150          // lebar area cetak
+    private const val SMALL_AH = 80           // tinggi area cetak
+    private const val SMALL_SIZE_W = 610      // SIZE kanvas (sama dgn kotak uji)
+    private const val SMALL_SIZE_H = 150
     // Kanvas perintah utk label 40x20: 40 mm / 0,73 x 8 = 438 dot, 20 mm / 0,73 x 8 = 219 dot.
     private const val W20_W = 438
     private const val W20_H = 219
@@ -137,13 +145,13 @@ object EscPosLabel {
         val yNama = if (big) h * 0.062f
                     else if (med) h * 0.155f
                     else if (wide) h * 0.083f
-                    else if (small) h * 0.053f
+                    else if (small) h * 0.00f
                     else if (w20) h * 0.064f
                     else sc * 3f
         val yHarga = if (big) h * 0.335f
                      else if (med) h * 0.355f
                      else if (wide) h * 0.35f
-                     else if (small) h * 0.213f
+                     else if (small) h * 0.133f
                      else if (w20) h * 0.173f
                      else sc * 7.4f
         paint.textSize = sc * 2.2f
@@ -155,7 +163,7 @@ object EscPosLabel {
         val topBar = if (big) (h * 0.445f).toInt()
                      else if (med) (h * 0.42f).toInt()
                      else if (wide) (h * 0.533f).toInt()
-                     else if (small) (h * 0.56f).toInt()
+                     else if (small) (h * 0.40f).toInt()
                      else if (w20) (h * 0.493f).toInt()
                      else (h - (sc * 8.4f)).toInt().coerceAtLeast(30)
         if (wide) {
@@ -196,20 +204,22 @@ object EscPosLabel {
             val bc = Code128.encodeCDigits(barcode) ?: Code128.encodeBText(barcode)
             // Label 40x30 (h>=240): barcode penuh mengisi sisa + nomor barcode di bawah (mirror TSPL).
             val bigL = h >= 240
-            val letakNomor = bigL || med || wide || small || w20
+            // small (25x15 area 15x8 mm) TIDAK mencetak nomor: tinggi 80 cmd hanya muat
+            // nama + harga x2 + barcode. Kalau nomor dipaksa, barcode terpotong.
+            val letakNomor = bigL || med || wide || w20
             // bigL (40x30): barcode 24% tinggi label (cetak 12,8 mm) + nomor di bawahnya.
             // med (30x20): barcode 36,5% (cetak 7,3 mm) + nomor. wide (50x25): 30% + nomor.
             val hpx = if (bigL) (h * 0.24f).toInt()
                       else if (med) (h * 0.365f).toInt()
                       else if (wide) (h * 0.30f).toInt()
-                      else if (small) (h * 0.267f).toInt()
+                      else if (small) (h * 0.133f).toInt()
                       else if (w20) (h * 0.319f).toInt()
                       else h - topBar
             drawBarcode(c, bc, hpx, topBar, sc, w)
             if (letakNomor) {
                 val txt = clipText(barcode, paint, w - (sc * 2))
                 paint.textSize = sc * 0.9f
-                c.drawText(txt, w / 2f, topBar + hpx + (if (med) sc * 1.1f else if (wide) sc * 1.3f else if (small) sc * 0.9f else if (w20) sc * 1.0f else sc * 1.6f), paint)
+                c.drawText(txt, w / 2f, topBar + hpx + (if (med) sc * 1.1f else if (wide) sc * 1.3f else if (small) sc * 0.4f else if (w20) sc * 1.0f else sc * 1.6f), paint)
             }
         }
         return bmp
@@ -453,21 +463,23 @@ object EscPosLabel {
                     out.write("BARCODE $bcX,$barY2,\"${barcodeKodeTsp(l.bc)}\",$barH2,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
                     out.write("TEXT ${centerXTsP(txt.length, 1, wC, CW_BIG)},$yTxt2,\"1\",0,1,1,\"$txt\"$eol".toByteArray(Charsets.US_ASCII))
                 } else if (small) {
-                    // ---- Desain A (25x15) di kanvas 250x150 (skala 0,80 TERUKUR): 0,1 mm per cmd.
-                    // Cetak: nama 0,80-2,80 / harga 3,20-7,20 / barcode 7,80-11,80 / nomor 12,20-14,20
-                    val pm = (2 downTo 1).firstOrNull { hTxt.length * CW_BIG * it <= wC - 20 } ?: 1
+                    // ---- Desain A utk AREA CETAK TERUKUR 150x80 cmd (15 x 8 mm) di x=200.
+                    // Tinggi 80 cmd tidak cukup utk 4 baris (nama 20 + harga x2 40 + barcode
+                    // 20 + nomor 20 = 100), jadi 3 baris: nama x1 / harga x2 / barcode.
+                    // Cetak: nama 0,0-2,0 / harga 2,0-6,0 / barcode 6,0-8,0 mm.
+                    val pm = (2 downTo 1).firstOrNull { hTxt.length * CW_BIG * it <= SMALL_AW - 4 } ?: 1
                     val fhP = CH_BIG * pm                      // 40 (pm2) / 20 (pm1)
-                    val yNb = 8                                // cetak 0,80 mm
-                    val yH2 = 32                               // cetak 3,20 mm
-                    val barY2 = 78                             // cetak 7,80 mm
-                    val barH2 = 40                             // cetak 4,00 mm
-                    val yTxt2 = 122                            // cetak 12,20-14,20 mm, sisa 0,80 mm
-                    val namaT = clipTsp(l.nama, nbNama25)
-                    val txt = clipTsp(l.bc, nbNama25)
-                    out.write("TEXT ${centerXTsP(namaT.length, 1, wC, CW_BIG)},$yNb,\"1\",0,1,1,\"$namaT\"$eol".toByteArray(Charsets.US_ASCII))
-                    out.write("TEXT ${centerXTsP(hTxt.length, pm, wC, CW_BIG)},$yH2,\"1\",0,$pm,$pm,\"$hTxt\"$eol".toByteArray(Charsets.US_ASCII))
-                    out.write("BARCODE $bcX,$barY2,\"${barcodeKodeTsp(l.bc)}\",$barH2,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
-                    out.write("TEXT ${centerXTsP(txt.length, 1, wC, CW_BIG)},$yTxt2,\"1\",0,1,1,\"$txt\"$eol".toByteArray(Charsets.US_ASCII))
+                    val yNb = SMALL_Y0                         // 0    -> 0,00 mm
+                    val yH2 = yNb + CH_BIG                     // 20   -> 2,00 mm
+                    val barY2 = yH2 + fhP                      // 60   -> 6,00 mm
+                    val barH2 = (SMALL_Y0 + SMALL_AH - barY2).coerceAtLeast(14)   // 20 -> 2,00 mm
+                    val namaT = clipTsp(l.nama, SMALL_AW / CW_BIG)
+                    val xNama = SMALL_X0 + centerXTsP(namaT.length, 1, SMALL_AW, CW_BIG)
+                    val xHarga = SMALL_X0 + centerXTsP(hTxt.length, pm, SMALL_AW, CW_BIG)
+                    val (bcXa, bcNa) = barcodeGeoCmd(l.bc, SMALL_AW)
+                    out.write("TEXT $xNama,$yNb,\"1\",0,1,1,\"$namaT\"$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("TEXT $xHarga,$yH2,\"1\",0,$pm,$pm,\"$hTxt\"$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("BARCODE ${SMALL_X0 + bcXa},$barY2,\"${barcodeKodeTsp(l.bc)}\",$barH2,0,0,$bcNa,$bcNa,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
                 } else if (wide) {
                     // ---- Desain B (50x25) di kanvas 548x274: nama, HARGA x3 dominan, garis
                     // pemisah, barcode, nomor. Cetak = cmd x 0,0913 mm.
@@ -582,7 +594,7 @@ object EscPosLabel {
             w == 400 && h == 200 -> WIDE_W to WIDE_H                        // 50x25
             w == 240 && h == 160 -> MED_W to MED_H                          // 30x20
             w == 320 && h == 160 -> W20_W to W20_H                          // 40x20
-            w == 200 && h == 120 -> SMALL_W to SMALL_H                      // 25x15
+            w == 200 && h == 120 -> SMALL_SIZE_W to SMALL_SIZE_H            // 25x15 (area 200..350, 0..80)
             else -> w to h
         }
     }
