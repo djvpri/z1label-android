@@ -619,25 +619,28 @@ object EscPosLabel {
         out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
         val sisi = 100          // 1 cm pada 0,1 mm/cmd
         val t = 3               // tebal garis, biar kebaca
+        // Arahan: sudut b TETAP, sudut a geser ke kiri 0,2 cm (20 cmd) -> kotak melebar
+        // 20 cmd ke kiri (lebar 120, x0 mundur 20) sementara sisi kanan/b tidak bergerak.
+        val lebar = sisi + 20
         // Riwayat arahan x: 360 (kanan 3,6 cm) - 210 (kiri 2,1 cm dari sudut a) + 100
-        // (kanan 1 cm dari sudut b) = 250 cmd.
-        val x0 = geserX - 210 + 100
+        // (kanan 1 cm dari sudut b) - 20 (a geser kiri 0,2 cm) = 230 cmd.
+        val x0 = geserX - 210 + 100 - 20
         // Arahan y: naik 0,2 cm = 20 cmd. y=0 sudah tepi atas kanvas, jadi nilai negatif
         // tidak bisa dicetak TSPL -> dipakai 0 (batas atas), sisanya perlu geser lewat GAP.
         val y0 = (0 - 20).coerceAtLeast(0)
-        bar(x0, y0, sisi, t)                  // atas
-        bar(x0, y0 + sisi - t, sisi, t)           // bawah
+        bar(x0, y0, lebar, t)                  // atas
+        bar(x0, y0 + sisi - t, lebar, t)           // bawah
         bar(x0, y0, t, sisi)                  // kiri
-        bar(x0 + sisi - t, y0, t, sisi)       // kanan
+        bar(x0 + lebar - t, y0, t, sisi)       // kanan
         // Huruf kecil (font "1" x1 = ~8x20 cmd = ~0,8 x 2 mm) di tiap sudut, di DALAM kotak:
         // a=kiri-atas, b=kanan-atas, c=kiri-bawah, d=kanan-bawah. Patokan arah koreksi.
         fun txt(x: Int, y: Int, v: String) {
             out.write("TEXT $x,$y,\"1\",0,1,1,\"$v\"$eol".toByteArray(Charsets.US_ASCII))
         }
         txt(x0 + t + 6, y0 + t + 4, "a")
-        txt(x0 + sisi - 22, y0 + t + 4, "b")
+        txt(x0 + lebar - 22, y0 + t + 4, "b")
         txt(x0 + t + 6, y0 + sisi - 26, "c")
-        txt(x0 + sisi - 22, y0 + sisi - 26, "d")
+        txt(x0 + lebar - 22, y0 + sisi - 26, "d")
         out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))
         return out.toByteArray()
     }
