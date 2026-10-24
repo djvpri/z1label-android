@@ -386,8 +386,8 @@ object EscPosLabel {
         val nbNama30 = if (medium) ((MED_W - 24) / CW_BIG).coerceAtLeast(8) else 0
         // 50x25: kanvas 548 dot, font "1" ~10 dot/char.
         val nbNama50 = if (wide) ((WIDE_W - 24) / CW_BIG).coerceAtLeast(10) else 0
-        // 25x15: kanvas 274 dot -> muat ~25 char font x1.
-        val nbNama25 = if (small) ((SMALL_W - 24) / CW_BIG).coerceAtLeast(8) else 0
+        // 25x15: area cetak 150 cmd -> 18 char font x1 (bukan kanvas 610).
+        val nbNama25 = if (small) ((SMALL_AW - 4) / CW_BIG).coerceAtLeast(8) else 0
         // 40x20: kanvas 438 dot -> muat ~41 char font x1.
         val nbNama40x20 = if (wide20) ((W20_W - 24) / CW_BIG).coerceAtLeast(10) else 0
         // NOTE multi-label (v1.6.11): PER-LABEL job utuh — setiap label = SIZE h + GAP + CLS +
