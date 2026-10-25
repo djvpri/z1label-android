@@ -557,6 +557,12 @@ object EscPosLabel {
                 }
             }
             out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))
+            // feedExtraMm > 0: maju tambahan (mm) setelah tiap label. Dipakai kalau PRINT
+            // 1,1 + GAP ternyata maju kurang -> isi bergeser naik pada label ke-2,3.
+            if (feedExtraMm > 0.0 && !bigLabel) {
+                val extra = (feedExtraMm.coerceIn(0.1, 20.0) * DOTS_PER_MM).toInt()
+                out.write("FORFEED $extra$eol".toByteArray(Charsets.US_ASCII))
+            }
             // FORFEED hanya untuk 40x30 (kanvas = ukuran fisik, jalur bigLabel). Ukuran lain
             // memakai kanvas perintah yg lebih besar dari label -> FORFEED menambah feed dan
             // membuat 1x cetak menghabiskan >1 lembar. Terukur 25x15: SIZE 150 + GAP 16 +
