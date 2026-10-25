@@ -673,38 +673,6 @@ object EscPosLabel {
     }
 
     /**
-     * Uji TERKENDALI: dua LABEL (dua siklus PRINT) dengan isi sama persis, bedanya hanya
-     * perintah setelah BARCODE:
-     *   Label 1 : BARCODE lalu langsung PRINT            (dugaan: hasil 2 mm)
-     *   Label 2 : BARCODE lalu satu TEXT kecil di dalam  (dugaan: hasil 5 mm)
-     * barH keduanya 50 cmd. Satu kali cetak = dua lembar bersebelahan, bisa dibandingkan
-     * langsung tanpa perbedaan versi build.
-     */
-    fun buatUjiTrailing(bc: String, widthMm: Int, heightMm: Int): ByteArray {
-        val (wC, hC) = kanvas(widthMm, heightMm)
-        val out = ByteArrayOutputStream()
-        val eol = "\r\n"
-        val kode = barcodeKodeTsp(bc)
-        val isi = sanitizeTsp(bc)
-        fun kepala(tanda: String) {
-            out.write("SIZE $wC,$hC$eol".toByteArray(Charsets.US_ASCII))
-            out.write("GAP 2,0$eol".toByteArray(Charsets.US_ASCII))
-            out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
-            out.write("TEXT ${SMALL_X0 + 2},2,\"1\",0,1,1,\"$tanda\"$eol".toByteArray(Charsets.US_ASCII))
-        }
-        // ---- label 1: BARCODE adalah perintah terakhir sebelum PRINT
-        kepala("L1 TANPA")
-        out.write("BARCODE 235,30,\"$kode\",50,0,0,1,1,\"$isi\"$eol".toByteArray(Charsets.US_ASCII))
-        out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))
-        // ---- label 2: ada TEXT setelah BARCODE
-        kepala("L2 DENGAN")
-        out.write("BARCODE 235,30,\"$kode\",50,0,0,1,1,\"$isi\"$eol".toByteArray(Charsets.US_ASCII))
-        out.write("TEXT ${SMALL_X0 + 2},100,\"1\",0,1,1,\"X\"$eol".toByteArray(Charsets.US_ASCII))
-        out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))
-        return out.toByteArray()
-    }
-
-    /**
      * Uji TINGGI vs ROTASI barcode. Satu label, tiga variasi isi sama:
      *   H20 : barH 20, rot 0  -> kondisi produksi sekarang (tinggi ~2 mm)
      *   H60 : barH 60, rot 0  -> apakah parameter height dipatuhi
