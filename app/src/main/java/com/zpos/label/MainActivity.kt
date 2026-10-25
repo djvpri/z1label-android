@@ -89,6 +89,7 @@ class MainActivity : AppCompatActivity() {
     private var densitas = 0                 // TSPL DENSITY 0..15 (0 = jangan diubah)
     private var kecepatan = 0                // TSPL SPEED 1..6 ips (0 = jangan diubah)
     private var modulBc = 0                  // 0 = otomatis, >0 = lebar modul barcode (cmd)
+    private var gapMm = 2.0                  // jarak fisik antar label (mm)
 
     private val permReq =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
@@ -166,6 +167,7 @@ class MainActivity : AppCompatActivity() {
         densitas = prefs.getInt("density", 0)
         kecepatan = prefs.getInt("speed", 0)
         modulBc = prefs.getInt("bcModule", 0)
+        gapMm = prefs.getFloat("gapMm", 2.0f).toDouble()
         namaToko = prefs.getString("nama_toko", "") ?: ""
         namaUser = prefs.getString("nama_user", "") ?: ""
         emailUser = prefs.getString("email_user", "") ?: ""
@@ -1178,10 +1180,12 @@ class MainActivity : AppCompatActivity() {
         val lblD = TextView(this)
         val lblS = TextView(this)
         val lblM = TextView(this)
+        val lblG = TextView(this)
         fun segarkan() {
             lblD.text = "Density: ${if (densitas == 0) "tidak diubah" else "$densitas / 15"}   (tinggi = lebih hitam)"
             lblS.text = "Speed: ${if (kecepatan == 0) "tidak diubah" else "$kecepatan / 6 ips"}   (rendah = lebih tegas)"
             lblM.text = "Lebar modul barcode: ${if (modulBc == 0) "otomatis (0,10 mm)" else "$modulBc cmd (${modulBc / 10.0} mm)"}"
+            lblG.text = String.format(java.util.Locale.US, "Jarak antar label (gap): %.1f mm", gapMm)
         }
         fun baris(judulTeks: String, label: TextView, minus: () -> Unit, plus: () -> Unit) {
             ll.addView(judul(judulTeks))
@@ -1196,12 +1200,15 @@ class MainActivity : AppCompatActivity() {
         baris("Modul barcode", lblM,
             { modulBc = if (modulBc <= 0) 0 else modulBc - 5 },
             { modulBc = if (modulBc >= 20) 20 else modulBc + 5 })
+        baris("Jarak antar label (gap)", lblG,
+            { gapMm = (gapMm - 0.1).coerceIn(0.0, 10.0) },
+            { gapMm = (gapMm + 0.1).coerceIn(0.0, 10.0) })
         segarkan()
         dlg.setView(ll)
         dlg.setTitle("Setelan Cetak")
         dlg.setOnDismissListener {
             prefs.edit().putInt("density", densitas).putInt("speed", kecepatan)
-                .putInt("bcModule", modulBc).apply()
+                .putInt("bcModule", modulBc).putFloat("gapMm", gapMm.toFloat()).apply()
             Logger.log(this, "cetak", "setelan: density=$densitas speed=$kecepatan modul=$modulBc")
         }
         dlg.show()
@@ -1497,7 +1504,7 @@ class MainActivity : AppCompatActivity() {
                             val lt = EscPosLabel.LabelT(p.nama, p.harga, bc)
                             List(cetakQty) { lt }
                         }
-                        EscPosLabel.buatRunTSPL(data, paperW, paperH, includeNama = true, fontMul = fontMul, barcode2d = barcodeMode == "2d", density = densitas, speed = kecepatan, bcModule = modulBc)
+                        EscPosLabel.buatRunTSPL(data, paperW, paperH, includeNama = true, fontMul = fontMul, barcode2d = barcodeMode == "2d", density = densitas, speed = kecepatan, bcModule = modulBc, gapMm = gapMm)
                     } else {
                         val bmpList = pilih.flatMap { p ->
                             try {
