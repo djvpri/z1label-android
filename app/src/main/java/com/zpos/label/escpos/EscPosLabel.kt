@@ -509,6 +509,10 @@ object EscPosLabel {
                     out.write("TEXT $xNama,$yN,\"1\",0,1,1,\"$namaT\"$eol".toByteArray(Charsets.US_ASCII))
                     out.write("TEXT $xHarga,$yH2,\"1\",0,$pm,$pm,\"$hTxt\"$eol".toByteArray(Charsets.US_ASCII))
                     out.write("BARCODE ${SMALL_X0 + bcXa},$barY2,\"${barcodeKodeTsp(l.bc)}\",$barH2,0,0,$bcNa,$bcNa,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
+                    // Penanda diagnostik: versi build + nilai barH yg benar-benar dikirim.
+                    // Kalau di kertas tertulis angka lain, berarti APK yg dipasang bukan build ini.
+                    val tagY = (barY2 + barH2 + 2).coerceAtMost(SMALL_Y0 + SMALL_AH - 10)
+                    out.write("TEXT ${SMALL_X0 + 2},$tagY,\"1\",0,1,1,\"V1840-H$barH2\"$eol".toByteArray(Charsets.US_ASCII))
                 } else if (wide) {
                     // ---- Desain B (50x25) di kanvas 548x274: nama, HARGA x3 dominan, garis
                     // pemisah, barcode, nomor. Cetak = cmd x 0,0913 mm.
