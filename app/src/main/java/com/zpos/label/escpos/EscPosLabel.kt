@@ -728,52 +728,34 @@ object EscPosLabel {
     }
 
     /**
-     * KOTAK UJI 1 cm x 1 cm di pojok kiri-atas kanvas. Satu-satunya isi label, sengaja tanpa
-     * teks: supaya yang diukur cuma kotak. 1 cm pada skala 0,80 = 100 cmd (1 cmd = 0,1 mm).
-     * Cetak -> ukur sisi kotak + jarak ke tepi label -> arah koreksi ditentukan dari situ.
+     * KOTAK UJI generik: kotak 1 cm di pojok kiri-atas kanvas + huruf a/b/c/d di dalam
+     * sudutnya. Dipakai utk mengukur skala (sisi kotak = 10 mm kalau skala 0,80) dan
+     * offset (jarak tepi label ke sisi kotak). Berlaku semua ukuran; tidak ada
+     * koordinat hardcode sisa kalibrasi 25x15.
      */
     fun buatKotakUji(widthMm: Int, heightMm: Int): ByteArray {
         val (wC, hC) = kanvas(widthMm, heightMm)
-        // Arahan user (dihitung dari sudut a): geser ke KIRI 2,1 cm = 210 cmd (1 cmd = 0,1 mm).
-        // Kanvas diperlebar supaya x offset + kotak masih di dalam SIZE (kalau x > SIZE, dipotong).
-        val geserX = 360
-        val lebarKanvas = wC + geserX
         val out = ByteArrayOutputStream()
         val eol = "\r\n"
         fun bar(x: Int, y: Int, w: Int, h: Int) {
             out.write("BAR $x,$y,$w,$h$eol".toByteArray(Charsets.US_ASCII))
         }
-        out.write("SIZE $lebarKanvas,$hC$eol".toByteArray(Charsets.US_ASCII))
-        out.write("GAP 2,0$eol".toByteArray(Charsets.US_ASCII))
-        out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
-        val sisi = 100          // 1 cm pada 0,1 mm/cmd
-        val t = 3               // tebal garis, biar kebaca
-        // Arahan (b tetap):
-        //   a geser kiri 0,2 + 0,3 = 0,5 cm -> 50 cmd; kotak melebar 50 cmd ke kiri.
-        //   c geser ke ATAS 0,2 cm -> 20 cmd: sisi bawah naik, kotak jadi lebih pendek.
-        val geserA = 50         // total geseran kiri sudut a (cmd)
-        val naikC = 20          // sudut c naik (cmd)
-        val lebar = sisi + geserA           // 150
-        val tinggi = sisi - naikC           // 80
-        // Riwayat arahan x: 360 (kanan 3,6 cm) - 210 (kiri 2,1 cm dari a) + 100 (kanan 1 cm
-        // dari b) - 50 (a kiri 0,5 cm) = 200 cmd.
-        val x0 = geserX - 210 + 100 - geserA
-        // Arahan y: naik 0,2 cm = 20 cmd. y=0 sudah tepi atas kanvas, jadi nilai negatif
-        // tidak bisa dicetak TSPL -> dipakai 0 (batas atas), sisanya perlu geser lewat GAP.
-        val y0 = (0 - 20).coerceAtLeast(0)
-        bar(x0, y0, lebar, t)                  // atas
-        bar(x0, y0 + tinggi - t, lebar, t)           // bawah
-        bar(x0, y0, t, tinggi)                  // kiri
-        bar(x0 + lebar - t, y0, t, tinggi)       // kanan
-        // Huruf kecil (font "1" x1 = ~8x20 cmd = ~0,8 x 2 mm) di tiap sudut, di DALAM kotak:
-        // a=kiri-atas, b=kanan-atas, c=kiri-bawah, d=kanan-bawah. Patokan arah koreksi.
         fun txt(x: Int, y: Int, v: String) {
             out.write("TEXT $x,$y,\"1\",0,1,1,\"$v\"$eol".toByteArray(Charsets.US_ASCII))
         }
-        txt(x0 + t + 6, y0 + t + 4, "a")
-        txt(x0 + lebar - 22, y0 + t + 4, "b")
-        txt(x0 + t + 6, y0 + tinggi - 26, "c")
-        txt(x0 + lebar - 22, y0 + tinggi - 26, "d")
+        out.write("SIZE $wC,$hC$eol".toByteArray(Charsets.US_ASCII))
+        out.write("GAP 2,0$eol".toByteArray(Charsets.US_ASCII))
+        out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
+        val sisi = 100          // 1 cm pada 0,1 mm/cmd
+        val t = 3
+        bar(0, 0, sisi, t)
+        bar(0, sisi - t, sisi, t)
+        bar(0, 0, t, sisi)
+        bar(sisi - t, 0, t, sisi)
+        txt(t + 6, t + 4, "a")
+        txt(sisi - 22, t + 4, "b")
+        txt(t + 6, sisi - 26, "c")
+        txt(sisi - 22, sisi - 26, "d")
         out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))
         return out.toByteArray()
     }
