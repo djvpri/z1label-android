@@ -485,36 +485,26 @@ object EscPosLabel {
                     out.write("BARCODE $bcX,$barY2,\"${barcodeKodeTsp(l.bc)}\",$barH2,0,0,$bcN,$bcN,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
                     out.write("TEXT ${centerXTsP(txt.length, 1, wC, CW_BIG)},$yTxt2,\"1\",0,1,1,\"$txt\"$eol".toByteArray(Charsets.US_ASCII))
                 } else if (small) {
-                    // ---- Desain A utk AREA CETAK TERUKUR 150x80 cmd (15 x 8 mm) di x=200.
-                    // Tinggi 80 cmd tidak cukup utk 4 baris (nama 20 + harga x2 40 + barcode
-                    // 20 + nomor 20 = 100), jadi 3 baris: nama x1 / harga x2 / barcode.
-                    // Cetak: nama 0,0-2,0 / harga 2,0-6,0 / barcode 6,0-8,0 mm.
-                    // Geser KANVAS 10 cmd: origin TSPL selalu (0,0), jadi menggeser kanvas =
-                    // mengurangi semua y sebesar 10. Nama sudah di y=0 -> tidak bisa ikut naik
-                    // (y negatif tidak dicetak). Jadi kanvas digeser utk baris yang punya ruang:
-                    // nama tetap, harga & barcode naik 1 mm dari posisi v1.8.25.
+                    // ---- Susunan A (arahan user): nama -> barcode -> HARGA.
+                    // Area cetak terukur: x 200..350 (15 mm), y 0..120 (12 mm).
+                    // Harga dicetak TERAKHIR: sekaligus jadi pemicu render penuh barcode
+                    // (uji: BARCODE sebagai perintah terakhir -> bar cuma 2 mm).
+                    //   nama     y  0-20  -> 0,0-2,0 mm
+                    //   barcode  y 20-50  -> 2,0-5,0 mm (3 mm)
+                    //   harga    y 50-90  -> 5,0-9,0 mm (x2) / 5,0-7,0 (x1)
                     val pm = (2 downTo 1).firstOrNull { hTxt.length * CW_BIG * it <= SMALL_AW - 4 } ?: 1
-                    val fhP = CH_BIG * pm                      // 40 (pm2) / 20 (pm1)
-                    val yN = 0                                 // nama: tepi atas kanvas (mentok)
-                    val yH2 = yN + CH_BIG                      // 20 -> 2,00 mm
-                    val barY2 = yH2 + fhP                      // 60/40 -> 6,00 / 4,00 mm
-                                                               // (jarak ke harga = 0, arahan user)
-                    // Uji v1.8.38: height DIPATUHI printer. barH 60 cmd -> terukur 5 mm.
-                    // barH 50 cmd -> ~4,2 mm; dipilih supaya masih muat area 12 mm.
-                    // Arahan user: tinggi barcode 0,3. Ditafsirkan 0,3 cm = 3 mm = 30 cmd,
-                    // karena 0,3 mm = 3 cmd tidak akan terbaca scanner mana pun.
-                    val barH2 = 30
+                    val fhP = CH_BIG * pm
+                    val barH2 = 30                             // tinggi barcode 3 mm
+                    val yN = 0
+                    val barY2 = yN + CH_BIG                    // 20
+                    val yH2 = barY2 + barH2                    // 50
                     val namaT = clipTsp(l.nama, SMALL_AW / CW_BIG)
                     val xNama = SMALL_X0 + centerXTsP(namaT.length, 1, SMALL_AW, CW_BIG)
                     val xHarga = SMALL_X0 + centerXTsP(hTxt.length, pm, SMALL_AW, CW_BIG)
                     val (bcXa, bcNa) = barcodeGeoCmd(l.bc, SMALL_BW)
+                    out.write("BARCODE ${SMALL_X0 + bcXa},$barY2,\"${barcodeKodeTsp(l.bc)}\",$barH2,0,0,$bcNa,$bcNa,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
                     out.write("TEXT $xNama,$yN,\"1\",0,1,1,\"$namaT\"$eol".toByteArray(Charsets.US_ASCII))
                     out.write("TEXT $xHarga,$yH2,\"1\",0,$pm,$pm,\"$hTxt\"$eol".toByteArray(Charsets.US_ASCII))
-                    out.write("BARCODE ${SMALL_X0 + bcXa},$barY2,\"${barcodeKodeTsp(l.bc)}\",$barH2,0,0,$bcNa,$bcNa,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
-                    // Penanda diagnostik: versi build + nilai barH yg benar-benar dikirim.
-                    // Kalau di kertas tertulis angka lain, berarti APK yg dipasang bukan build ini.
-                    val tagY = (barY2 + barH2 + 2).coerceAtMost(SMALL_Y0 + SMALL_AH - 10)
-                    out.write("TEXT ${SMALL_X0 + 2},$tagY,\"1\",0,1,1,\"V1840-H$barH2\"$eol".toByteArray(Charsets.US_ASCII))
                 } else if (wide) {
                     // ---- Desain B (50x25) di kanvas 548x274: nama, HARGA x3 dominan, garis
                     // pemisah, barcode, nomor. Cetak = cmd x 0,0913 mm.
