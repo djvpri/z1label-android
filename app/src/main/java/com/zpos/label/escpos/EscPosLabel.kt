@@ -663,6 +663,38 @@ object EscPosLabel {
     }
 
     /**
+     * Uji TINGGI vs ROTASI barcode. Satu label, tiga variasi isi sama:
+     *   H20 : barH 20, rot 0  -> kondisi produksi sekarang (tinggi ~2 mm)
+     *   H60 : barH 60, rot 0  -> apakah parameter height dipatuhi
+     *   R90 : barH 40, rot 1  -> bar mendatar, "panjang" jadi lebih besar
+     * Baca: H60 = H20 -> height diabaikan. R90 mendatar -> rotasi dipatuhi.
+     */
+    fun buatUjiTinggiRotasi(bc: String, widthMm: Int, heightMm: Int): ByteArray {
+        val (wC, hC) = kanvas(widthMm, heightMm)
+        val out = ByteArrayOutputStream()
+        val eol = "\r\n"
+        val kode = barcodeKodeTsp(bc)
+        val isi = sanitizeTsp(bc)
+        out.write("SIZE $wC,$hC$eol".toByteArray(Charsets.US_ASCII))
+        out.write("GAP 2,0$eol".toByteArray(Charsets.US_ASCII))
+        out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
+        fun txt(x: Int, y: Int, t: String) {
+            out.write("TEXT $x,$y,\"1\",0,1,1,\"$t\"$eol".toByteArray(Charsets.US_ASCII))
+        }
+        fun bcCmd(x: Int, y: Int, h: Int, rot: Int) {
+            out.write("BARCODE $x,$y,\"$kode\",$h,0,$rot,1,1,\"$isi\"$eol".toByteArray(Charsets.US_ASCII))
+        }
+        txt(SMALL_X0, 0, "H20")
+        bcCmd(235, 18, 20, 0)
+        txt(SMALL_X0, 45, "H60")
+        bcCmd(235, 63, 60, 0)
+        txt(SMALL_X0, 130, "R90")
+        bcCmd(SMALL_X0, 148, 40, 1)
+        out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))
+        return out.toByteArray()
+    }
+
+    /**
      * Perintah DETEKSI GAP / panjang label. Dipakai kalau 1x PRINT menghabiskan >1 lembar:
      * artinya printer belum tahu pitch label (dia feed ke posisi gap yg salah).
      * TSPL: `GAPDETECT` = ukur jarak gap; `SET GAP` = setel sensor gap; `AUTODETECT` cadangan.
