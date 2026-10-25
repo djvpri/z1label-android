@@ -756,7 +756,8 @@ object EscPosLabel {
         val dyA = 10            // a turun (cmd), tetap
         val x0 = dxA
         val y0 = dyA
-        val lebar = (sisi - dxA) + 300
+        // Arahan terakhir: a tetap, b geser kiri 1 mm (10 cmd) -> lebar 390 - 10 = 380
+        val lebar = (sisi - dxA) + 300 - 10
         val tinggi = (sisi - dyA) + 50
         // Sisi digambar PER SEGMEN 95 cmd, bukan satu BAR panjang.
         // Temuan v1.8.57: BAR horizontal selebar 390 cmd TIDAK tercetak, sedangkan BAR
