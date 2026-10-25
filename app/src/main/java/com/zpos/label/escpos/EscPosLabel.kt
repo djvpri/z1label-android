@@ -509,6 +509,14 @@ object EscPosLabel {
                     out.write("TEXT $xNama,$yN,\"1\",0,1,1,\"$namaT\"$eol".toByteArray(Charsets.US_ASCII))
                     out.write("TEXT $xHarga,$yH2,\"1\",0,$pm,$pm,\"$hTxt\"$eol".toByteArray(Charsets.US_ASCII))
                     out.write("BARCODE ${SMALL_X0 + bcXa},$barY2,\"${barcodeKodeTsp(l.bc)}\",$barH2,0,0,$bcNa,$bcNa,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
+                    // TEMUAN (bukti dari 3 rilis berurutan, barH selalu 50):
+                    //   v1.8.39 tanpa apa pun setelah BARCODE -> barcode 2 mm (pendek)
+                    //   v1.8.40 dgn TEXT kecil setelah BARCODE -> barcode 5 mm (benar)
+                    //   v1.8.41 TEXT itu dihapus          -> kembali 2 mm
+                    // Jadi printer baru merender BARCODE penuh kalau ada perintah lain
+                    // sesudahnya. Solusi: dot 2x2 di dalam area (tak terlihat di label,
+                    // tidak menambah baris) sbg pemicu render.
+                    out.write("BAR ${SMALL_X0 + 2},${SMALL_Y0 + SMALL_AH - 4},2,2$eol".toByteArray(Charsets.US_ASCII))
                 } else if (wide) {
                     // ---- Desain B (50x25) di kanvas 548x274: nama, HARGA x3 dominan, garis
                     // pemisah, barcode, nomor. Cetak = cmd x 0,0913 mm.
