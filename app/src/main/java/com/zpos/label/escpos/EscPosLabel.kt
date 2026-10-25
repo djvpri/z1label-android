@@ -621,6 +621,42 @@ object EscPosLabel {
     }
 
     /**
+     * Barcode UJI: tiga variasi bertumpuk dalam satu label, utk membedakan penyebab
+     * barcode tidak tercetak pada area 15x10 mm.
+     *   V1 yg sekarang      : x=206, n=2, tinggi 20, human readable 0
+     *   V2 lebih pendek     : x=206, n=1 (simbol 79 cmd, di dalam area), tinggi 20
+     *   V3 wide 2x narrow   : x=206, n=1 w=2, tinggi 20, human readable 1
+     * Cetak -> lihat mana yg muncul. Satu lembar, tidak perlu beberapa rilis.
+     */
+    fun buatUjiBarcode(bc: String, widthMm: Int, heightMm: Int): ByteArray {
+        val (wC, hC) = kanvas(widthMm, heightMm)
+        val out = ByteArrayOutputStream()
+        val eol = "\r\n"
+        val kode = barcodeKodeTsp(bc)
+        val isi = sanitizeTsp(bc)
+        out.write("SIZE $wC,$hC$eol".toByteArray(Charsets.US_ASCII))
+        out.write("GAP 2,0$eol".toByteArray(Charsets.US_ASCII))
+        out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
+        fun txt(x: Int, y: Int, t: String) {
+            out.write("TEXT $x,$y,\"1\",0,1,1,\"$t\"$eol".toByteArray(Charsets.US_ASCII))
+        }
+        fun bcCmd(x: Int, y: Int, h: Int, n: Int, w: Int, hr: Int) {
+            out.write("BARCODE $x,$y,\"$kode\",$h,$hr,0,$n,$w,\"$isi\"$eol".toByteArray(Charsets.US_ASCII))
+        }
+        // V1: sama persis dgn produksi (x=206, n=2 w=2, hr=0) di y=4
+        txt(SMALL_X0, 4, "V1 n2")
+        bcCmd(SMALL_X0 + 6, 22, 20, 2, 2, 0)
+        // V2: n=1 (simbol 79 cmd, muat di dalam area) di y=48
+        txt(SMALL_X0, 48, "V2 n1")
+        bcCmd(SMALL_X0 + 6, 66, 20, 1, 1, 0)
+        // V3: n=1, wide=2 -> 3x, human readable 1, di y=92
+        txt(SMALL_X0, 92, "V3 n1w2 hr")
+        bcCmd(SMALL_X0 + 6, 110, 24, 1, 2, 1)
+        out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))
+        return out.toByteArray()
+    }
+
+    /**
      * Perintah DETEKSI GAP / panjang label. Dipakai kalau 1x PRINT menghabiskan >1 lembar:
      * artinya printer belum tahu pitch label (dia feed ke posisi gap yg salah).
      * TSPL: `GAPDETECT` = ukur jarak gap; `SET GAP` = setel sensor gap; `AUTODETECT` cadangan.
