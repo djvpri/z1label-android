@@ -1445,8 +1445,7 @@ class MainActivity : AppCompatActivity() {
                     }; return@launch
                 }
             }
-            val bc = tampil.firstOrNull()?.let { barcodeLabel(it, bcSrc == "13") } ?: "20124588"
-            val bytes = EscPosLabel.buatUjiTinggiRotasi(bc, paperW, paperH)
+            val bytes = EscPosLabel.buatKotakUji(paperW, paperH)
             val err = withContext(Dispatchers.IO) { BluetoothPrinter.write(bytes) }
             withContext(Dispatchers.Main) {
                 Toast.makeText(this@MainActivity,
