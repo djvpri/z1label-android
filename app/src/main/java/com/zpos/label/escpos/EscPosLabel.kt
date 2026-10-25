@@ -748,13 +748,21 @@ object EscPosLabel {
         out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
         val sisi = 100          // 1 cm pada 0,1 mm/cmd
         val t = 3
-        bar(0, 0, sisi, t)
-        bar(0, sisi - t, sisi, t)
-        bar(0, 0, t, sisi)
-        bar(sisi - t, 0, t, sisi)
-        txt(t + 6, t + 4, "a")
+        // Arahan user: sudut a turun 1 mm (10 cmd) dan geser kanan 1 mm (10 cmd).
+        // b/c/d tetap -> kotak mengecil: lebar 100-10=90, tinggi 100-10=90.
+        val dxA = 10            // a geser kanan (cmd)
+        val dyA = 10            // a turun (cmd)
+        val x0 = dxA
+        val y0 = dyA
+        val lebar = sisi - dxA
+        val tinggi = sisi - dyA
+        bar(x0, y0, lebar, t)                 // atas
+        bar(x0, y0 + tinggi - t, lebar, t)    // bawah
+        bar(x0, y0, t, tinggi)                // kiri
+        bar(x0 + lebar - t, y0, t, tinggi)    // kanan
+        txt(x0 + t + 6, y0 + t + 4, "a")
         txt(sisi - 22, t + 4, "b")
-        txt(t + 6, sisi - 26, "c")
+        txt(x0 + t + 6, sisi - 26, "c")
         txt(sisi - 22, sisi - 26, "d")
         out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))
         return out.toByteArray()
