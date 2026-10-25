@@ -66,9 +66,7 @@ object EscPosLabel {
      * V3 (wide 2x) terlalu kecil, V2 (n=1, simbol 79 cmd) satu-satunya yg utuh.
      * 170 cmd dipakai lagi => simbol 158 cmd, ujung 364 > batas area 350 -> terpotong.
      */
-    // Barcode boleh lebih lebar dari area teks: modul 0,10 mm (n=1) terbukti bleeding
-    // & tak terbaca (scan+Gemini). BW 170 -> n=2, modul 0,20 mm, simbol 15,8 mm.
-    private const val SMALL_BW = 170
+    private const val SMALL_BW = 150
     private const val SMALL_SIZE_W = 610      // SIZE kanvas (sama dgn kotak uji)
     private const val SMALL_SIZE_H = 150
     /**
@@ -509,20 +507,14 @@ object EscPosLabel {
                     val namaT = clipTsp(l.nama, SMALL_AW / CW_BIG)
                     val xNama = SMALL_X0 + centerXTsP(namaT.length, 1, SMALL_AW, CW_BIG)
                     val xHarga = SMALL_X0 + centerXTsP(hTxt.length, pm, SMALL_AW, CW_BIG)
-                    val (_, bcNa) = barcodeGeoCmd(l.bc, SMALL_BW)
-                    // pusatkan simbol pada area teks; boleh melewati tepi kiri/kanan sedikit
-                    val totalModul = if (l.bc.length == 13 && l.bc.all { it.isDigit() }) Ean13.TOTAL_MODUL
-                                     else (Code128.encodeCDigits(l.bc) ?: Code128.encodeBText(l.bc)).totalModul.coerceAtLeast(10)
-                    val bcXa = ((SMALL_AW - totalModul * bcNa) / 2)
-                    // URUTAN PENTING: BARCODE dulu, teks sesudahnya.
-                    // Uji berurutan (barH sama): TEXT setelah BARCODE -> tinggi penuh;
-                    // tanpa apa pun sesudahnya -> 2 mm; BAR 2x2 sesudahnya -> 2 mm.
-                    // Jadi barcode tidak boleh jadi perintah terakhir. Penanda debug dihapus.
-                    out.write("BARCODE ${SMALL_X0 + bcXa},$barY2,\"${barcodeKodeTsp(l.bc)}\",$barH2,0,0,$bcNa,$bcNa,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
+                    val (bcXa, bcNa) = barcodeGeoCmd(l.bc, SMALL_BW)
                     out.write("TEXT $xNama,$yN,\"1\",0,1,1,\"$namaT\"$eol".toByteArray(Charsets.US_ASCII))
                     out.write("TEXT $xHarga,$yH2,\"1\",0,$pm,$pm,\"$hTxt\"$eol".toByteArray(Charsets.US_ASCII))
-                    // jaring pengaman: TEXT kosong di dalam area (tak menggambar apa pun)
-                    out.write("TEXT ${SMALL_X0 + 2},${SMALL_Y0 + SMALL_AH - 4},\"1\",0,1,1,\"\"$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("BARCODE ${SMALL_X0 + bcXa},$barY2,\"${barcodeKodeTsp(l.bc)}\",$barH2,0,0,$bcNa,$bcNa,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
+                    // Penanda diagnostik: versi build + nilai barH yg benar-benar dikirim.
+                    // Kalau di kertas tertulis angka lain, berarti APK yg dipasang bukan build ini.
+                    val tagY = (barY2 + barH2 + 2).coerceAtMost(SMALL_Y0 + SMALL_AH - 10)
+                    out.write("TEXT ${SMALL_X0 + 2},$tagY,\"1\",0,1,1,\"V1840-H$barH2\"$eol".toByteArray(Charsets.US_ASCII))
                 } else if (wide) {
                     // ---- Desain B (50x25) di kanvas 548x274: nama, HARGA x3 dominan, garis
                     // pemisah, barcode, nomor. Cetak = cmd x 0,0913 mm.
