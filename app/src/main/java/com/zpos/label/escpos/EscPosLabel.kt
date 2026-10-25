@@ -58,7 +58,7 @@ object EscPosLabel {
      */
     private const val SMALL_X0 = 200          // offset kiri area cetak (cmd)
     private const val SMALL_Y0 = 0
-    private const val SMALL_AW = 150          // lebar area cetak
+    private const val SMALL_AW = 250          // lebar area cetak (25 mm; tick uji tembus 450)
     private const val SMALL_AH = 100          // tinggi area cetak (10 mm; +2 mm sesuai arahan)
     /**
      * Lebar barcode = lebar area cetak (150 cmd), BUKAN dilebarkan.
@@ -66,7 +66,7 @@ object EscPosLabel {
      * V3 (wide 2x) terlalu kecil, V2 (n=1, simbol 79 cmd) satu-satunya yg utuh.
      * 170 cmd dipakai lagi => simbol 158 cmd, ujung 364 > batas area 350 -> terpotong.
      */
-    private const val SMALL_BW = 150
+    private const val SMALL_BW = 250          // = lebar area: cukup utk n=3 (237 cmd)
     private const val SMALL_SIZE_W = 610      // SIZE kanvas (sama dgn kotak uji)
     private const val SMALL_SIZE_H = 150
     /**
@@ -499,7 +499,7 @@ object EscPosLabel {
                     val yH2 = yN + CH_BIG                      // 20 -> 2,00 mm
                     val barY2 = yH2 + fhP                      // 60/40 -> 6,00 / 4,00 mm
                                                                // (jarak ke harga = 0, arahan user)
-                    val barH2 = 20                             // 2,00 mm (uji: T20 paling bagus)
+                    val barH2 = 40                             // 4,00 mm (2 mm terukur terlalu tipis)
                     val namaT = clipTsp(l.nama, SMALL_AW / CW_BIG)
                     val xNama = SMALL_X0 + centerXTsP(namaT.length, 1, SMALL_AW, CW_BIG)
                     val xHarga = SMALL_X0 + centerXTsP(hTxt.length, pm, SMALL_AW, CW_BIG)
