@@ -758,14 +758,37 @@ object EscPosLabel {
         val y0 = dyA
         val lebar = (sisi - dxA) + 300
         val tinggi = (sisi - dyA) + 50
-        bar(x0, y0, lebar, t)                 // atas
-        bar(x0, y0 + tinggi - t, lebar, t)    // bawah
-        bar(x0, y0, t, tinggi)                // kiri
-        bar(x0 + lebar - t, y0, t, tinggi)    // kanan
+        // Sisi digambar PER SEGMEN 95 cmd, bukan satu BAR panjang.
+        // Temuan v1.8.57: BAR horizontal selebar 390 cmd TIDAK tercetak, sedangkan BAR
+        // vertikal (lebar 3 cmd) tercetak -> dugaan firmware menolak BAR yang melewati
+        // lebar kepala cetak. Dengan segmen, batas itu bisa dilihat langsung di kertas:
+        // segmen mana yang hilang = di situ batasnya.
+        fun segmenH(y: Int, panjang: Int) {
+            var x = x0
+            while (x < x0 + panjang) {
+                val w = minOf(95, x0 + panjang - x)
+                bar(x, y, w, t)
+                x += w + 1        // jeda 1 cmd supaya batas segmen kelihatan
+            }
+        }
+        fun segmenV(x: Int, panjang: Int) {
+            var y = y0
+            while (y < y0 + panjang) {
+                val h = minOf(95, y0 + panjang - y)
+                bar(x, y, t, h)
+                y += h + 1
+            }
+        }
+        segmenH(y0, lebar)                       // atas
+        segmenH(y0 + tinggi - t, lebar)          // bawah
+        segmenV(x0, tinggi)                      // kiri
+        segmenV(x0 + lebar - t, tinggi)          // kanan
+        // Huruf harus ikut LEBAR/TINGGI kotak, bukan `sisi` (bug v1.8.57: b/d tetap
+        // di x=sisi-22=78 walau kotak sudah dilebarkan -> huruf tidak bergeser).
         txt(x0 + t + 6, y0 + t + 4, "a")
-        txt(sisi - 22, t + 4, "b")
-        txt(x0 + t + 6, sisi - 26, "c")
-        txt(sisi - 22, sisi - 26, "d")
+        txt(x0 + lebar - 22, y0 + t + 4, "b")
+        txt(x0 + t + 6, y0 + tinggi - 26, "c")
+        txt(x0 + lebar - 22, y0 + tinggi - 26, "d")
         out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))
         return out.toByteArray()
     }
