@@ -490,11 +490,11 @@ object EscPosLabel {
                     // Harga dicetak TERAKHIR: sekaligus jadi pemicu render penuh barcode
                     // (uji: BARCODE sebagai perintah terakhir -> bar cuma 2 mm).
                     //   nama     y  0-20  -> 0,0-2,0 mm
-                    //   barcode  y 20-50  -> 2,0-5,0 mm (3 mm)
-                    //   harga    y 50-90  -> 5,0-9,0 mm (x2) / 5,0-7,0 (x1)
+                    //   barcode  y 20-60  -> 2,0-6,0 mm (4 mm)
+                    //   harga    y 60-100 -> 6,0-10,0 mm (x2) / 6,0-8,0 (x1)
                     val pm = (2 downTo 1).firstOrNull { hTxt.length * CW_BIG * it <= SMALL_AW - 4 } ?: 1
                     val fhP = CH_BIG * pm
-                    val barH2 = 30                             // tinggi barcode 3 mm
+                    val barH2 = 40                             // tinggi barcode 4 mm (arahan user)
                     val yN = 0
                     val barY2 = yN + CH_BIG                    // 20
                     val yH2 = barY2 + barH2                    // 50
