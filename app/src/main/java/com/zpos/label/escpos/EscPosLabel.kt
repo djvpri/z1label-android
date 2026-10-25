@@ -64,6 +64,8 @@ object EscPosLabel {
     private const val SMALL_BW = 170
     private const val SMALL_SIZE_W = 610      // SIZE kanvas (sama dgn kotak uji)
     private const val SMALL_SIZE_H = 150
+    /** Offset GAP (dot) utk menggeser awal cetak 25x15 ke atas. 10 cmd = 1 mm. */
+    private const val SMALL_GAP_OFS = 10
     // Kanvas perintah utk label 40x20: 40 mm / 0,73 x 8 = 438 dot, 20 mm / 0,73 x 8 = 219 dot.
     private const val W20_W = 438
     private const val W20_H = 219
@@ -407,7 +409,15 @@ object EscPosLabel {
             // GAP = jarak fisik antar label (mm, dot). 16 mm itu SALAH untuk label 25x15:
             // pitch jadi 15+16=31 mm -> feed lari ke label berikutnya. Pakai gap pendek 2 mm
             // supaya pitch = tinggi label + 2.
-            out.write("GAP ${if (bigLabel) "16,0" else "2,0"}$eol".toByteArray(Charsets.US_ASCII))
+            // small: GAP m,n -> n = offset jarak cetak (dot). Arahan user "tambah gap":
+            // offset 10 cmd menggeser awal cetak 1 mm ke atas di kertas, tanpa mengubah
+            // koordinat isi (origin tetap 0,0). Risiko: feed bisa lari ke label berikutnya.
+            val gapArg = when {
+                bigLabel -> "16,0"
+                small -> "2,${SMALL_GAP_OFS}"
+                else -> "2,0"
+            }
+            out.write("GAP $gapArg$eol".toByteArray(Charsets.US_ASCII))
             out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
             if (barcode2d) {
                 val (mQ, xQ) = qrGeo(l.bc, w, h, barY)
