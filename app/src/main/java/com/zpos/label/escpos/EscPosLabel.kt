@@ -748,14 +748,16 @@ object EscPosLabel {
         out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
         val sisi = 100          // 1 cm pada 0,1 mm/cmd
         val t = 3
-        // Arahan user: sudut a turun 1 mm (10 cmd) dan geser kanan 1 mm (10 cmd).
-        // b/c/d tetap -> kotak mengecil: lebar 100-10=90, tinggi 100-10=90.
-        val dxA = 10            // a geser kanan (cmd)
-        val dyA = 10            // a turun (cmd)
+        // Riwayat arahan (relatif thd hasil sebelumnya):
+        //   1) a turun 10 cmd + a kanan 10 cmd  -> x0/y0 = 10, lebar/tinggi 90
+        //   2) a TETAP, b geser kanan 3 cm (300 cmd), c geser bawah 0,5 cm (50 cmd)
+        //      -> lebar = 90 + 300 = 390 ; tinggi = 90 + 50 = 140 ; x0/y0 tetap 10
+        val dxA = 10            // a geser kanan (cmd), tetap
+        val dyA = 10            // a turun (cmd), tetap
         val x0 = dxA
         val y0 = dyA
-        val lebar = sisi - dxA
-        val tinggi = sisi - dyA
+        val lebar = (sisi - dxA) + 300
+        val tinggi = (sisi - dyA) + 50
         bar(x0, y0, lebar, t)                 // atas
         bar(x0, y0 + tinggi - t, lebar, t)    // bawah
         bar(x0, y0, t, tinggi)                // kiri
