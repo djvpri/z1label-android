@@ -497,7 +497,8 @@ object EscPosLabel {
                     val fhP = CH_BIG * pm                      // 40 (pm2) / 20 (pm1)
                     val yN = 0                                 // nama: tepi atas kanvas (mentok)
                     val yH2 = yN + CH_BIG                      // 20 -> 2,00 mm
-                    val barY2 = yH2 + fhP + 10                 // 70/60 -> 7,00 / 6,00 mm
+                    val barY2 = yH2 + fhP                      // 60/40 -> 6,00 / 4,00 mm
+                                                               // (jarak ke harga = 0, arahan user)
                     val barH2 = 20                             // 2,00 mm
                     val namaT = clipTsp(l.nama, SMALL_AW / CW_BIG)
                     val xNama = SMALL_X0 + centerXTsP(namaT.length, 1, SMALL_AW, CW_BIG)
