@@ -59,7 +59,7 @@ object EscPosLabel {
     private const val SMALL_X0 = 200          // offset kiri area cetak (cmd)
     private const val SMALL_Y0 = 0
     private const val SMALL_AW = 150          // lebar area cetak
-    private const val SMALL_AH = 100          // tinggi area cetak (10 mm; +2 mm sesuai arahan)
+    private const val SMALL_AH = 120          // tinggi area cetak (12 mm) utk barcode 5 mm
     /**
      * Lebar barcode = lebar area cetak (150 cmd), BUKAN dilebarkan.
      * Uji v1.8.30 (satu label, 3 variasi): V1 (170 cmd -> simbol 158 cmd) TERPOTONG,
@@ -499,7 +499,9 @@ object EscPosLabel {
                     val yH2 = yN + CH_BIG                      // 20 -> 2,00 mm
                     val barY2 = yH2 + fhP                      // 60/40 -> 6,00 / 4,00 mm
                                                                // (jarak ke harga = 0, arahan user)
-                    val barH2 = 20                             // 2,00 mm (uji: T20 paling bagus)
+                    // Uji v1.8.38: height DIPATUHI printer. barH 60 cmd -> terukur 5 mm.
+                    // barH 50 cmd -> ~4,2 mm; dipilih supaya masih muat area 12 mm.
+                    val barH2 = 50
                     val namaT = clipTsp(l.nama, SMALL_AW / CW_BIG)
                     val xNama = SMALL_X0 + centerXTsP(namaT.length, 1, SMALL_AW, CW_BIG)
                     val xHarga = SMALL_X0 + centerXTsP(hTxt.length, pm, SMALL_AW, CW_BIG)
