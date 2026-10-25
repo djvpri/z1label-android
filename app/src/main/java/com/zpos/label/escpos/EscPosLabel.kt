@@ -499,7 +499,7 @@ object EscPosLabel {
                     val yH2 = yN + CH_BIG                      // 20 -> 2,00 mm
                     val barY2 = yH2 + fhP                      // 60/40 -> 6,00 / 4,00 mm
                                                                // (jarak ke harga = 0, arahan user)
-                    val barH2 = 40                             // 4,00 mm (naik dari 20 = 2 mm)
+                    val barH2 = 20                             // 2,00 mm (uji: T20 paling bagus)
                     val namaT = clipTsp(l.nama, SMALL_AW / CW_BIG)
                     val xNama = SMALL_X0 + centerXTsP(namaT.length, 1, SMALL_AW, CW_BIG)
                     val xHarga = SMALL_X0 + centerXTsP(hTxt.length, pm, SMALL_AW, CW_BIG)
@@ -627,29 +627,37 @@ object EscPosLabel {
     }
 
     /**
-     * Uji TINGGI barcode: tiga barcode isi sama, tinggi 20 / 40 / 80 cmd, lebar & modul
-     * identik (n=1). Tujuan: tahu apakah parameter height di perintah BARCODE dipatuhi
-     * printer, atau diabaikan (kalau diabaikan, tinggi tak bisa diatur dari app).
+     * Uji BATAS KANAN cetak. Area 200..350 cmd dipakai sejak awal, tapi permintaan
+     * memperlebar area utk barcode butuh tahu sampai x berapa printer benar-benar
+     * mencetak. Label ini: satu bar panjang x=200..500 (tinggi 10 cmd) + tick tiap
+     * 50 cmd dgn label angkanya. Ukur/lihat di mana bar berhenti -> itulah batas nyata.
      */
-    fun buatUjiTinggiBarcode(bc: String, widthMm: Int, heightMm: Int): ByteArray {
+    fun buatUjiBatasKanan(widthMm: Int, heightMm: Int): ByteArray {
         val (wC, hC) = kanvas(widthMm, heightMm)
         val out = ByteArrayOutputStream()
         val eol = "\r\n"
-        val kode = barcodeKodeTsp(bc)
-        val isi = sanitizeTsp(bc)
-        out.write("SIZE $wC,$hC$eol".toByteArray(Charsets.US_ASCII))
-        out.write("GAP 2,0$eol".toByteArray(Charsets.US_ASCII))
-        out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
+        fun bar(x: Int, y: Int, w: Int, h: Int) {
+            out.write("BAR $x,$y,$w,$h$eol".toByteArray(Charsets.US_ASCII))
+        }
         fun txt(x: Int, y: Int, t: String) {
             out.write("TEXT $x,$y,\"1\",0,1,1,\"$t\"$eol".toByteArray(Charsets.US_ASCII))
         }
-        // tiga barcode: x sama, tinggi beda
-        txt(SMALL_X0, 0, "T20")
-        out.write("BARCODE 235,18,\"$kode\",20,0,0,1,1,\"$isi\"$eol".toByteArray(Charsets.US_ASCII))
-        txt(SMALL_X0, 40, "T40")
-        out.write("BARCODE 235,58,\"$kode\",40,0,0,1,1,\"$isi\"$eol".toByteArray(Charsets.US_ASCII))
-        txt(SMALL_X0, 100, "T80")
-        out.write("BARCODE 235,118,\"$kode\",80,0,0,1,1,\"$isi\"$eol".toByteArray(Charsets.US_ASCII))
+        out.write("SIZE $wC,$hC$eol".toByteArray(Charsets.US_ASCII))
+        out.write("GAP 2,0$eol".toByteArray(Charsets.US_ASCII))
+        out.write("CLS$eol".toByteArray(Charsets.US_ASCII))
+        // bar utama 200..500 (30 mm) tinggi 10 cmd
+        bar(200, 6, 300, 10)
+        // tick + label tiap 50 cmd: 250 300 350 400 450
+        var x = 250
+        while (x <= 450) {
+            bar(x, 20, 2, 16)
+            txt(x - 8, 40, "$x")
+            x += 50
+        }
+        // penanda awal area yg sudah terbukti (200 & 350)
+        bar(200, 60, 2, 20); txt(196, 84, "200")
+        bar(350, 60, 2, 20); txt(346, 84, "350")
+        txt(200, 108, "UKUR SAMPAI MANA BAR")
         out.write("PRINT 1,1$eol".toByteArray(Charsets.US_ASCII))
         return out.toByteArray()
     }
