@@ -66,7 +66,9 @@ object EscPosLabel {
      * V3 (wide 2x) terlalu kecil, V2 (n=1, simbol 79 cmd) satu-satunya yg utuh.
      * 170 cmd dipakai lagi => simbol 158 cmd, ujung 364 > batas area 350 -> terpotong.
      */
-    private const val SMALL_BW = 150
+    // Barcode boleh lebih lebar dari area teks: modul 0,10 mm (n=1) terbukti bleeding
+    // & tak terbaca (scan+Gemini). BW 170 -> n=2, modul 0,20 mm, simbol 15,8 mm.
+    private const val SMALL_BW = 170
     private const val SMALL_SIZE_W = 610      // SIZE kanvas (sama dgn kotak uji)
     private const val SMALL_SIZE_H = 150
     /**
@@ -507,7 +509,11 @@ object EscPosLabel {
                     val namaT = clipTsp(l.nama, SMALL_AW / CW_BIG)
                     val xNama = SMALL_X0 + centerXTsP(namaT.length, 1, SMALL_AW, CW_BIG)
                     val xHarga = SMALL_X0 + centerXTsP(hTxt.length, pm, SMALL_AW, CW_BIG)
-                    val (bcXa, bcNa) = barcodeGeoCmd(l.bc, SMALL_BW)
+                    val (_, bcNa) = barcodeGeoCmd(l.bc, SMALL_BW)
+                    // pusatkan simbol pada area teks; boleh melewati tepi kiri/kanan sedikit
+                    val totalModul = if (l.bc.length == 13 && l.bc.all { it.isDigit() }) Ean13.TOTAL_MODUL
+                                     else (Code128.encodeCDigits(l.bc) ?: Code128.encodeBText(l.bc)).totalModul.coerceAtLeast(10)
+                    val bcXa = ((SMALL_AW - totalModul * bcNa) / 2)
                     // URUTAN PENTING: BARCODE dulu, teks sesudahnya.
                     // Uji berurutan (barH sama): TEXT setelah BARCODE -> tinggi penuh;
                     // tanpa apa pun sesudahnya -> 2 mm; BAR 2x2 sesudahnya -> 2 mm.
