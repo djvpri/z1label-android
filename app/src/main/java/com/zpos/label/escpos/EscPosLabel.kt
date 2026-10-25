@@ -501,7 +501,9 @@ object EscPosLabel {
                                                                // (jarak ke harga = 0, arahan user)
                     // Uji v1.8.38: height DIPATUHI printer. barH 60 cmd -> terukur 5 mm.
                     // barH 50 cmd -> ~4,2 mm; dipilih supaya masih muat area 12 mm.
-                    val barH2 = 50
+                    // Arahan user: tinggi barcode 0,3. Ditafsirkan 0,3 cm = 3 mm = 30 cmd,
+                    // karena 0,3 mm = 3 cmd tidak akan terbaca scanner mana pun.
+                    val barH2 = 30
                     val namaT = clipTsp(l.nama, SMALL_AW / CW_BIG)
                     val xNama = SMALL_X0 + centerXTsP(namaT.length, 1, SMALL_AW, CW_BIG)
                     val xHarga = SMALL_X0 + centerXTsP(hTxt.length, pm, SMALL_AW, CW_BIG)
