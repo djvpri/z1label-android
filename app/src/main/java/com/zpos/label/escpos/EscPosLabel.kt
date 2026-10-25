@@ -499,7 +499,7 @@ object EscPosLabel {
                     val yH2 = yN + CH_BIG                      // 20 -> 2,00 mm
                     val barY2 = yH2 + fhP                      // 60/40 -> 6,00 / 4,00 mm
                                                                // (jarak ke harga = 0, arahan user)
-                    val barH2 = 20                             // 2,00 mm
+                    val barH2 = 40                             // 4,00 mm (naik dari 20 = 2 mm)
                     val namaT = clipTsp(l.nama, SMALL_AW / CW_BIG)
                     val xNama = SMALL_X0 + centerXTsP(namaT.length, 1, SMALL_AW, CW_BIG)
                     val xHarga = SMALL_X0 + centerXTsP(hTxt.length, pm, SMALL_AW, CW_BIG)
