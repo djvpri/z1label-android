@@ -164,7 +164,7 @@ object EscPosLabel {
                     else sc * 3f
         val yHarga = if (big) h * 0.335f
                      else if (med) h * 0.355f
-                     else if (wide) h * 0.144f
+                     else if (wide) h * 0.368f
                      else if (small) h * 0.20f
                      else if (w20) h * 0.173f
                      else sc * 7.4f
@@ -176,7 +176,7 @@ object EscPosLabel {
 
         val topBar = if (big) (h * 0.445f).toInt()
                      else if (med) (h * 0.42f).toInt()
-                     else if (wide) (h * 0.336f).toInt()
+                     else if (wide) (h * 0.176f).toInt()
                      else if (small) (h * 0.467f).toInt()
                      else if (w20) (h * 0.493f).toInt()
                      else (h - (sc * 8.4f)).toInt().coerceAtLeast(30)
@@ -519,10 +519,14 @@ object EscPosLabel {
                     // barcode barH 40 di 8,4-12,4 / (nomor tidak dipakai di desain A).
                     val pm = (2 downTo 1).firstOrNull { hTxt.length * CW_BIG * it <= WIDE_AW - 8 } ?: 1
                     val fhP = CH_BIG * pm                      // 40 (x2) / 20 (x1)
-                    val yNb = 12                               // 1,2 mm
-                    val yH2 = yNb + CH_BIG + 4                 // 36 -> 3,6 mm
-                    val barY2 = yH2 + fhP + 8                  // 84 (pm2) -> 8,4 mm
-                    val barH2 = 40                             // 4,0 mm (uji: height dipatuhi)
+                    // Arahan user: barcode ke TENGAH, harga dipindah ke BAWAH barcode.
+                    //   nama    y 12-32   -> 1,2-3,2 mm
+                    //   barcode y 44-84   -> 4,4-8,4 mm (4 mm)
+                    //   harga   y 92-132  -> 9,2-13,2 mm (x2) / 9,2-11,2 (x1)
+                    val yNb = 12
+                    val barY2 = yNb + CH_BIG + 12              // 44 -> 4,4 mm
+                    val barH2 = 40                             // 4,0 mm
+                    val yH2 = barY2 + barH2 + 8                // 92 -> 9,2 mm
                     val namaT = clipTsp(l.nama, WIDE_AW / CW_BIG)
                     val xNama = WIDE_X0 + centerXTsP(namaT.length, 1, WIDE_AW, CW_BIG)
                     val xHarga = WIDE_X0 + centerXTsP(hTxt.length, pm, WIDE_AW, CW_BIG)
