@@ -64,8 +64,13 @@ object EscPosLabel {
     private const val SMALL_BW = 170
     private const val SMALL_SIZE_W = 610      // SIZE kanvas (sama dgn kotak uji)
     private const val SMALL_SIZE_H = 150
-    /** Offset GAP (dot) utk menggeser awal cetak 25x15 ke atas. 10 cmd = 1 mm. */
-    private const val SMALL_GAP_OFS = 10
+    /**
+     * Offset GAP. WAJIB 0. Diuji v1.8.27 (nilai 10): printer menggeser origin jauh lebih
+     * besar dari 10 dot -> elemen paling bawah (barcode) keluar dari area cetak dan hilang,
+     * sementara nama/harga tetap terlihat. Arti parameter ke-2 `GAP` tidak konsisten antar
+     * firmware, jadi jangan dipakai untuk menggeser posisi.
+     */
+    private const val SMALL_GAP_OFS = 0
     // Kanvas perintah utk label 40x20: 40 mm / 0,73 x 8 = 438 dot, 20 mm / 0,73 x 8 = 219 dot.
     private const val W20_W = 438
     private const val W20_H = 219
