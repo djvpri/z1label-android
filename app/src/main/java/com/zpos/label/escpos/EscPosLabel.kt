@@ -59,7 +59,7 @@ object EscPosLabel {
     private const val SMALL_X0 = 200          // offset kiri area cetak (cmd)
     private const val SMALL_Y0 = 0
     private const val SMALL_AW = 150          // lebar area cetak
-    private const val SMALL_AH = 80           // tinggi area cetak
+    private const val SMALL_AH = 100          // tinggi area cetak (10 mm; +2 mm sesuai arahan)
     /** Barcode dilebarkan 0,2 cm (20 cmd) dr area; boleh melewati kotak (arahan user). */
     private const val SMALL_BW = 170
     private const val SMALL_SIZE_W = 610      // SIZE kanvas (sama dgn kotak uji)
