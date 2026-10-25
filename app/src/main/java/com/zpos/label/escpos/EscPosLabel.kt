@@ -60,8 +60,13 @@ object EscPosLabel {
     private const val SMALL_Y0 = 0
     private const val SMALL_AW = 150          // lebar area cetak
     private const val SMALL_AH = 100          // tinggi area cetak (10 mm; +2 mm sesuai arahan)
-    /** Barcode dilebarkan 0,2 cm (20 cmd) dr area; boleh melewati kotak (arahan user). */
-    private const val SMALL_BW = 170
+    /**
+     * Lebar barcode = lebar area cetak (150 cmd), BUKAN dilebarkan.
+     * Uji v1.8.30 (satu label, 3 variasi): V1 (170 cmd -> simbol 158 cmd) TERPOTONG,
+     * V3 (wide 2x) terlalu kecil, V2 (n=1, simbol 79 cmd) satu-satunya yg utuh.
+     * 170 cmd dipakai lagi => simbol 158 cmd, ujung 364 > batas area 350 -> terpotong.
+     */
+    private const val SMALL_BW = 150
     private const val SMALL_SIZE_W = 610      // SIZE kanvas (sama dgn kotak uji)
     private const val SMALL_SIZE_H = 150
     /**
