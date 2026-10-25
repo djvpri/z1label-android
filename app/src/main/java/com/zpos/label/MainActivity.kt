@@ -17,6 +17,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -85,6 +86,9 @@ class MainActivity : AppCompatActivity() {
     private var tokoExpired = false         // langganan expired?
     private var barcodeMode = "1d"           // "1d" (EAN-13/Code128) | "2d" (QR)
     private var bcSrc = "6"                  // "6" (barcode_internal label) | "13" (barcode asli)
+    private var densitas = 0                 // TSPL DENSITY 0..15 (0 = jangan diubah)
+    private var kecepatan = 0                // TSPL SPEED 1..6 ips (0 = jangan diubah)
+    private var modulBc = 0                  // 0 = otomatis, >0 = lebar modul barcode (cmd)
 
     private val permReq =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
@@ -159,6 +163,9 @@ class MainActivity : AppCompatActivity() {
         fontMul = prefs.getInt("fontMul", 1)
         barcodeMode = prefs.getString("barcodeMode", "1d") ?: "1d"
         bcSrc = prefs.getString("bcSrc", "6") ?: "6"
+        densitas = prefs.getInt("density", 0)
+        kecepatan = prefs.getInt("speed", 0)
+        modulBc = prefs.getInt("bcModule", 0)
         namaToko = prefs.getString("nama_toko", "") ?: ""
         namaUser = prefs.getString("nama_user", "") ?: ""
         emailUser = prefs.getString("email_user", "") ?: ""
@@ -234,6 +241,7 @@ class MainActivity : AppCompatActivity() {
                 com.zpos.label.R.id.menu_sort -> pilihSort()
                 com.zpos.label.R.id.menu_proto -> toggleProto()
                 com.zpos.label.R.id.menu_font -> toggleFont()
+                com.zpos.label.R.id.menu_cetak -> aturCetak()
                 com.zpos.label.R.id.menu_barcode -> toggleBarcode()
                 com.zpos.label.R.id.menu_bcsrc -> toggleBcSrc()
                 com.zpos.label.R.id.menu_update -> cekUpdate(otomatis = false)
@@ -1161,6 +1169,44 @@ class MainActivity : AppCompatActivity() {
 
     private fun fontLabel(m: Int) = when (m) { 1 -> "S"; 2 -> "M"; else -> "L" }
 
+    /** Dialog setelan cetak: DENSITY, SPEED, lebar modul barcode. Utk barcode yg
+     *  kadang terbaca: density naik + speed turun + modul lebih tebal. */
+    private fun aturCetak() {
+        val dlg = AlertDialog.Builder(this).create()
+        val ll = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(48, 32, 48, 8) }
+        fun judul(t: String) = TextView(this).apply { text = t; setTextColor(0xFF444444.toInt()); textSize = 13f }
+        val lblD = TextView(this)
+        val lblS = TextView(this)
+        val lblM = TextView(this)
+        fun segarkan() {
+            lblD.text = "Density: ${if (densitas == 0) "tidak diubah" else "$densitas / 15"}   (tinggi = lebih hitam)"
+            lblS.text = "Speed: ${if (kecepatan == 0) "tidak diubah" else "$kecepatan / 6 ips"}   (rendah = lebih tegas)"
+            lblM.text = "Lebar modul barcode: ${if (modulBc == 0) "otomatis (0,10 mm)" else "$modulBc cmd (${modulBc / 10.0} mm)"}"
+        }
+        fun baris(judulTeks: String, label: TextView, minus: () -> Unit, plus: () -> Unit) {
+            ll.addView(judul(judulTeks))
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            row.addView(Button(this).apply { text = "−"; setOnClickListener { minus(); segarkan() } })
+            row.addView(label, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            row.addView(Button(this).apply { text = "+"; setOnClickListener { plus(); segarkan() } })
+            ll.addView(row)
+        }
+        baris("Density", lblD, { densitas = (densitas - 1).coerceIn(0, 15) }, { densitas = (densitas + 1).coerceIn(0, 15) })
+        baris("Speed", lblS, { kecepatan = (kecepatan - 1).coerceIn(0, 6) }, { kecepatan = (kecepatan + 1).coerceIn(0, 6) })
+        baris("Modul barcode", lblM,
+            { modulBc = if (modulBc <= 0) 0 else modulBc - 5 },
+            { modulBc = if (modulBc >= 20) 20 else modulBc + 5 })
+        segarkan()
+        dlg.setView(ll)
+        dlg.setTitle("Setelan Cetak")
+        dlg.setOnDismissListener {
+            prefs.edit().putInt("density", densitas).putInt("speed", kecepatan)
+                .putInt("bcModule", modulBc).apply()
+            Logger.log(this, "cetak", "setelan: density=$densitas speed=$kecepatan modul=$modulBc")
+        }
+        dlg.show()
+    }
+
     private fun toggleFont() {
         val opt = arrayOf("S (kecil)", "M (sedang)", "L (besar)")
         val cur = (fontMul - 1).coerceIn(0, 2)
@@ -1451,7 +1497,7 @@ class MainActivity : AppCompatActivity() {
                             val lt = EscPosLabel.LabelT(p.nama, p.harga, bc)
                             List(cetakQty) { lt }
                         }
-                        EscPosLabel.buatRunTSPL(data, paperW, paperH, includeNama = true, fontMul = fontMul, barcode2d = barcodeMode == "2d")
+                        EscPosLabel.buatRunTSPL(data, paperW, paperH, includeNama = true, fontMul = fontMul, barcode2d = barcodeMode == "2d", density = densitas, speed = kecepatan, bcModule = modulBc)
                     } else {
                         val bmpList = pilih.flatMap { p ->
                             try {

@@ -29,6 +29,9 @@
                     android:id="@+id/menu_font"
                     android:title="Font (S / M / L)" />
                 <item
+                    android:id="@+id/menu_cetak"
+                    android:title="Setelan Cetak (density/speed/modul)" />
+                <item
                     android:id="@+id/menu_barcode"
                     android:title="Mode Barcode (1D / 2D)" />
                 <item

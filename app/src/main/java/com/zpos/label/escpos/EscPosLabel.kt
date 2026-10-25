@@ -340,7 +340,11 @@ object EscPosLabel {
         heightMm: Int = 15,
         includeNama: Boolean = true,
         fontMul: Int = 1,
-        barcode2d: Boolean = false
+        barcode2d: Boolean = false,
+        // Setelan printer (TSPL: DENSITY 0-15, SPEED 1-6 ips) & lebar modul barcode.
+        density: Int = 0,          // 0 = jangan dikirim (pakai setelan printer)
+        speed: Int = 0,
+        bcModule: Int = 0          // 0 = otomatis (perilaku lama)
     ): ByteArray {
         val w = (widthMm * DOTS_PER_MM).toInt()   // 200
         val h = (heightMm * DOTS_PER_MM).toInt()  // 120
@@ -411,6 +415,11 @@ object EscPosLabel {
         //   - FORFEED <h> eksplisit = maju TEPAT SATU label (h dot) antar job -> tak bertimpa
         //     (v1.6.9 pakai FORFEED tanpa angka = feed default kurang -> timpa kalau >1 label).
         //   - konten per label dari `l` masing2 -> item beda tercetak beda.
+        // DENSITY & SPEED = setelan printer, dikirim sekali di awal job.
+        // 0 = TIDAK dikirim -> printer tetap pakai setelannya sendiri (default aman,
+        // tidak mengubah hasil 40x30 atau ukuran lain yg sudah benar).
+        if (density in 1..15) out.write("DENSITY $density$eol".toByteArray(Charsets.US_ASCII))
+        if (speed in 1..6) out.write("SPEED $speed$eol".toByteArray(Charsets.US_ASCII))
         for (l in ls) {
             // Harga 40x30: pasang titik ribuan (Rp 50.000) apa pun bentuk input (& idempoten).
             // Harga 40x30 sudah dibersihkan & titik-ribuan dipasang ulang (sanitizeTsp asli membuang '.')
@@ -501,7 +510,9 @@ object EscPosLabel {
                     val namaT = clipTsp(l.nama, SMALL_AW / CW_BIG)
                     val xNama = SMALL_X0 + centerXTsP(namaT.length, 1, SMALL_AW, CW_BIG)
                     val xHarga = SMALL_X0 + centerXTsP(hTxt.length, pm, SMALL_AW, CW_BIG)
-                    val (bcXa, bcNa) = barcodeGeoCmd(l.bc, SMALL_BW)
+                    // bcModule > 0 = paksa lebar modul (cmd) supaya bar lebih tebal.
+                    val (bcXa, bcNa) = if (bcModule > 0) barcodeGeoModul(l.bc, SMALL_AW, bcModule)
+                                       else barcodeGeoCmd(l.bc, SMALL_BW)
                     out.write("BARCODE ${SMALL_X0 + bcXa},$barY2,\"${barcodeKodeTsp(l.bc)}\",$barH2,0,0,$bcNa,$bcNa,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
                     out.write("TEXT $xNama,$yN,\"1\",0,1,1,\"$namaT\"$eol".toByteArray(Charsets.US_ASCII))
                     out.write("TEXT $xHarga,$yH2,\"1\",0,$pm,$pm,\"$hTxt\"$eol".toByteArray(Charsets.US_ASCII))
@@ -587,6 +598,18 @@ object EscPosLabel {
         val bwReal = (total * n * skala).toInt()
         val x = ((wDots - bwReal) / 2 - lead).coerceAtLeast(0)
         return x to n
+    }
+
+    /**
+     * Barcode dgn LEBAR MODUL DIPAKSA (cmd). Dipakai saat barcode kadang terbaca:
+     * modul 0,10 mm terlalu tipis -> naikkan ke 20 cmd (0,20 mm) / 30 cmd (0,30 mm).
+     * Simbol dipusatkan pada area teks; boleh melewati tepi kalau tidak muat.
+     */
+    private fun barcodeGeoModul(bc: String, areaW: Int, modul: Int): Pair<Int, Int> {
+        val total = if (bc.length == 13 && bc.all { it.isDigit() }) Ean13.TOTAL_MODUL
+        else (Code128.encodeCDigits(bc) ?: Code128.encodeBText(bc)).totalModul.coerceAtLeast(10)
+        val m = modul.coerceIn(1, 6)
+        return ((areaW - total * m) / 2) to m
     }
 
     /**
