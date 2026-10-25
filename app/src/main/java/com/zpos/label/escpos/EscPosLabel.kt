@@ -338,7 +338,8 @@ object EscPosLabel {
         density: Int = 0,          // 0 = jangan dikirim (pakai setelan printer)
         speed: Int = 0,
         bcModule: Int = 0,         // 0 = otomatis (perilaku lama)
-        gapMm: Double = 2.0        // jarak fisik antar label (mm) utk perintah GAP
+        gapMm: Double = 2.0,       // jarak fisik antar label (mm) utk perintah GAP
+        feedExtraMm: Double = 0.0  // feed tambahan per label (mm); 0 = tidak dikirim
     ): ByteArray {
         val w = (widthMm * DOTS_PER_MM).toInt()   // 200
         val h = (heightMm * DOTS_PER_MM).toInt()  // 120
