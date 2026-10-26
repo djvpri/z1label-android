@@ -91,6 +91,8 @@ class MainActivity : AppCompatActivity() {
     private var modulBc = 0                  // 0 = otomatis, >0 = lebar modul barcode (cmd)
     private var gapMm = 2.0                  // jarak fisik antar label (mm)
     private var feedMm = 0.0                 // feed tambahan tiap label (mm), 0 = tidak
+    private var offX = 0                       // geser X semua isi (cmd, boleh negatif)
+    private var offY = 0                       // geser Y semua isi (cmd, boleh negatif)
 
     private val permReq =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
@@ -170,6 +172,7 @@ class MainActivity : AppCompatActivity() {
         modulBc = prefs.getInt("bcModule", 0)
         gapMm = prefs.getFloat("gapMm", 2.0f).toDouble()
         feedMm = prefs.getFloat("feedMm", 0f).toDouble()
+        muatOffsetPrinter()
         namaToko = prefs.getString("nama_toko", "") ?: ""
         namaUser = prefs.getString("nama_user", "") ?: ""
         emailUser = prefs.getString("email_user", "") ?: ""
@@ -1098,6 +1101,7 @@ class MainActivity : AppCompatActivity() {
         builder.setItems(names) { _, i ->
             printerAddress = list[i].address
             prefs.edit().putString("printer", printerAddress).apply()
+            muatOffsetPrinter()
             setPrinterLabel()
         }
         builder.setNeutralButton(if (scanAktif) "Berhenti scan" else "🔍 Scan perangkat") { _, _ ->
@@ -1184,12 +1188,16 @@ class MainActivity : AppCompatActivity() {
         val lblM = TextView(this)
         val lblG = TextView(this)
         val lblF = TextView(this)
+        val lblX = TextView(this)
+        val lblY = TextView(this)
         fun segarkan() {
             lblD.text = "Density: ${if (densitas == 0) "tidak diubah" else "$densitas / 15"}   (tinggi = lebih hitam)"
             lblS.text = "Speed: ${if (kecepatan == 0) "tidak diubah" else "$kecepatan / 6 ips"}   (rendah = lebih tegas)"
             lblM.text = "Lebar modul barcode: ${if (modulBc == 0) "otomatis (0,10 mm)" else "$modulBc cmd (${modulBc / 10.0} mm)"}"
             lblG.text = String.format(java.util.Locale.US, "Jarak antar label (gap): %.1f mm", gapMm)
             lblF.text = String.format(java.util.Locale.US, "Feed tambahan tiap label: %.1f mm", feedMm)
+            lblX.text = String.format(java.util.Locale.US, "Geser X: %+.1f mm  (negatif = kiri)", offX / 10.0)
+            lblY.text = String.format(java.util.Locale.US, "Geser Y: %+.1f mm  (negatif = atas)", offY / 10.0)
         }
         fun baris(judulTeks: String, label: TextView, minus: () -> Unit, plus: () -> Unit) {
             ll.addView(judul(judulTeks))
@@ -1210,6 +1218,13 @@ class MainActivity : AppCompatActivity() {
         baris("Feed tambahan tiap label", lblF,
             { feedMm = (feedMm - 0.5).coerceIn(0.0, 20.0) },
             { feedMm = (feedMm + 0.5).coerceIn(0.0, 20.0) })
+        // Offset disimpan per printer (MAC) -- Ainuo dan Clabel beda origin.
+        baris("Geser X (printer ini)", lblX,
+            { offX = (offX - 5).coerceIn(-200, 200) },
+            { offX = (offX + 5).coerceIn(-200, 200) })
+        baris("Geser Y (printer ini)", lblY,
+            { offY = (offY - 5).coerceIn(-100, 100) },
+            { offY = (offY + 5).coerceIn(-100, 100) })
         segarkan()
         dlg.setView(ll)
         dlg.setTitle("Setelan Cetak")
@@ -1217,9 +1232,23 @@ class MainActivity : AppCompatActivity() {
             prefs.edit().putInt("density", densitas).putInt("speed", kecepatan)
                 .putInt("bcModule", modulBc).putFloat("gapMm", gapMm.toFloat())
                 .putFloat("feedMm", feedMm.toFloat()).apply()
+            simpanOffsetPrinter()
             Logger.log(this, "cetak", "setelan: density=$densitas speed=$kecepatan modul=$modulBc")
         }
         dlg.show()
+    }
+
+    /** Offset per printer: kunci preferensi memakai alamat Bluetooth (MAC).
+     *  Ainuo dan Clabel punya origin berbeda, jadi geseran disimpan terpisah. */
+    private fun muatOffsetPrinter() {
+        val key = printerAddress ?: "default"
+        offX = prefs.getInt("offX_$key", 0)
+        offY = prefs.getInt("offY_$key", 0)
+    }
+
+    private fun simpanOffsetPrinter() {
+        val key = printerAddress ?: "default"
+        prefs.edit().putInt("offX_$key", offX).putInt("offY_$key", offY).apply()
     }
 
     private fun toggleFont() {
@@ -1445,7 +1474,7 @@ class MainActivity : AppCompatActivity() {
                     }; return@launch
                 }
             }
-            val bytes = EscPosLabel.buatKotakUji(paperW, paperH)
+            val bytes = EscPosLabel.buatKotakUji(paperW, paperH, offsetXCmd = offX, offsetYCmd = offY)
             val err = withContext(Dispatchers.IO) { BluetoothPrinter.write(bytes) }
             withContext(Dispatchers.Main) {
                 Toast.makeText(this@MainActivity,
@@ -1511,7 +1540,8 @@ class MainActivity : AppCompatActivity() {
                             val lt = EscPosLabel.LabelT(p.nama, p.harga, bc)
                             List(cetakQty) { lt }
                         }
-                        EscPosLabel.buatRunTSPL(data, paperW, paperH, includeNama = true, fontMul = fontMul, barcode2d = barcodeMode == "2d", density = densitas, speed = kecepatan, bcModule = modulBc, gapMm = gapMm, feedExtraMm = feedMm)
+                        EscPosLabel.buatRunTSPL(data, paperW, paperH, includeNama = true, fontMul = fontMul, barcode2d = barcodeMode == "2d", density = densitas, speed = kecepatan, bcModule = modulBc, gapMm = gapMm, feedExtraMm = feedMm,
+                            offsetXCmd = offX, offsetYCmd = offY)
                     } else {
                         val bmpList = pilih.flatMap { p ->
                             try {

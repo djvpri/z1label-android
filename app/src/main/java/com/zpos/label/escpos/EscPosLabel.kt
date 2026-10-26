@@ -341,7 +341,9 @@ object EscPosLabel {
         speed: Int = 0,
         bcModule: Int = 0,         // 0 = otomatis (perilaku lama)
         gapMm: Double = 2.0,       // jarak fisik antar label (mm) utk perintah GAP
-        feedExtraMm: Double = 0.0  // feed tambahan per label (mm); 0 = tidak dikirim
+        feedExtraMm: Double = 0.0,  // feed tambahan per label (mm); 0 = tidak dikirim
+        offsetXCmd: Int = 0,       // geser X semua isi (cmd, boleh negatif)
+        offsetYCmd: Int = 0        // geser Y semua isi (cmd, boleh negatif)
     ): ByteArray {
         val w = (widthMm * DOTS_PER_MM).toInt()   // 200
         val h = (heightMm * DOTS_PER_MM).toInt()  // 120
@@ -385,6 +387,12 @@ object EscPosLabel {
         // Satu sumber kebenaran: kanvas() dipakai juga oleh buatKotakUji(), jadi label
         // kalibrasi & label produk selalu berada di ruang koordinat yang sama.
         val (wC, hC) = kanvas(widthMm, heightMm)
+        // ---- OFFSET POSISI (per printer): origin berbeda antar device (Ainuo vs Clabel).
+        // Dijepit: x tidak boleh negatif dan x+lebar tidak melewati batas kepala cetak
+        // (384 cmd) karena perintah BAR/TEXT di luar batas diabaikan printer.
+        val maxX = 384
+        fun ox(x: Int, w: Int): Int = (x + offsetXCmd).coerceIn(0, (maxX - w).coerceAtLeast(0))
+        fun oy(y: Int): Int = (y + offsetYCmd).coerceAtLeast(0)
         // Spasi teks(harga)↔barcode utk 40x30 = 0,5 cm (40 dot dr bawah harga). Grund gap6 sudah ada di yB,
         // jadi tambah 34 di sini. Ukuran lain (h<240) gap 0 (perilaku lama).
         val bigGap = if (bigLabel) 34 else 0
@@ -510,9 +518,10 @@ object EscPosLabel {
                     // bcModule > 0 = paksa lebar modul (cmd) supaya bar lebih tebal.
                     val (bcXa, bcNa) = if (bcModule > 0) barcodeGeoModul(l.bc, SMALL_AW, bcModule)
                                        else barcodeGeoCmd(l.bc, SMALL_BW)
-                    out.write("BARCODE ${SMALL_X0 + bcXa},$barY2,\"${barcodeKodeTsp(l.bc)}\",$barH2,0,0,$bcNa,$bcNa,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
-                    out.write("TEXT $xNama,$yN,\"1\",0,1,1,\"$namaT\"$eol".toByteArray(Charsets.US_ASCII))
-                    out.write("TEXT $xHarga,$yH2,\"1\",0,$pm,$pm,\"$hTxt\"$eol".toByteArray(Charsets.US_ASCII))
+                    val bcWid = totalModulOf(l.bc) * bcNa
+                    out.write("BARCODE ${ox(SMALL_X0 + bcXa, bcWid)},${oy(barY2)},\"${barcodeKodeTsp(l.bc)}\",$barH2,0,0,$bcNa,$bcNa,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("TEXT ${ox(xNama, namaT.length * CW_BIG)},${oy(yN)},\"1\",0,1,1,\"$namaT\"$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("TEXT ${ox(xHarga, hTxt.length * CW_BIG * pm)},${oy(yH2)},\"1\",0,$pm,$pm,\"$hTxt\"$eol".toByteArray(Charsets.US_ASCII))
                 } else if (wide) {
                     // ---- Desain A (50x25) di AREA TERUKUR 380x140 cmd (38 x 14 mm).
                     // Cetak = cmd x 0,1 mm. Target: nama 1,2-3,2 / harga x2 3,6-7,6 /
@@ -534,9 +543,10 @@ object EscPosLabel {
                     val (bcXw, bcNw) = if (bcModule > 0) barcodeGeoModul(l.bc, WIDE_AW, bcModule)
                                        else barcodeGeoCmd(l.bc, WIDE_AW)
                     // BARCODE dulu, teks sesudahnya (pemicu render penuh, sama seperti 25x15).
-                    out.write("BARCODE ${WIDE_X0 + bcXw},$barY2,\"${barcodeKodeTsp(l.bc)}\",$barH2,0,0,$bcNw,$bcNw,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
-                    out.write("TEXT $xNama,$yNb,\"1\",0,1,1,\"$namaT\"$eol".toByteArray(Charsets.US_ASCII))
-                    out.write("TEXT $xHarga,$yH2,\"1\",0,$pm,$pm,\"$hTxt\"$eol".toByteArray(Charsets.US_ASCII))
+                    val bcWidW = totalModulOf(l.bc) * bcNw
+                    out.write("BARCODE ${ox(WIDE_X0 + bcXw, bcWidW)},${oy(barY2)},\"${barcodeKodeTsp(l.bc)}\",$barH2,0,0,$bcNw,$bcNw,\"${sanitizeTsp(l.bc)}\"$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("TEXT ${ox(xNama, namaT.length * CW_BIG)},${oy(yNb)},\"1\",0,1,1,\"$namaT\"$eol".toByteArray(Charsets.US_ASCII))
+                    out.write("TEXT ${ox(xHarga, hTxt.length * CW_BIG * pm)},${oy(yH2)},\"1\",0,$pm,$pm,\"$hTxt\"$eol".toByteArray(Charsets.US_ASCII))
                 } else if (medium) {
                     // ---- Layout A (30x20) di kanvas perintah 329x219 (lihat wC/hC).
                     // Cetak (mm) = cmd x 0,0913, jadi target Layout A: nama 1,3 / harga 3,5 / barcode 8,4 /
@@ -593,8 +603,7 @@ object EscPosLabel {
      * @return [x (center), narrow]
      */
     private fun barcodeGeo(bc: String, wDots: Int, lead: Int = 0): Pair<Int, Int> {
-        val total = if (bc.length == 13 && bc.all { it.isDigit() }) Ean13.TOTAL_MODUL
-        else (Code128.encodeCDigits(bc) ?: Code128.encodeBText(bc)).totalModul.coerceAtLeast(10)
+        val total = totalModulOf(bc)
         val quiet = 10
         // Lebar command = total×n; tercetak = total×n×0,73. Anggarkan quiet zone 2×10 modul.
         val n = (wDots / (TSPL_BC_SCALE * (total + 2 * quiet))).toInt().coerceIn(1, 5)
@@ -612,8 +621,7 @@ object EscPosLabel {
      * Simbol dipusatkan pada area teks; boleh melewati tepi kalau tidak muat.
      */
     private fun barcodeGeoModul(bc: String, areaW: Int, modul: Int): Pair<Int, Int> {
-        val total = if (bc.length == 13 && bc.all { it.isDigit() }) Ean13.TOTAL_MODUL
-        else (Code128.encodeCDigits(bc) ?: Code128.encodeBText(bc)).totalModul.coerceAtLeast(10)
+        val total = totalModulOf(bc)
         val m = modul.coerceIn(1, 6)
         return ((areaW - total * m) / 2) to m
     }
@@ -622,9 +630,13 @@ object EscPosLabel {
      * Barcode utk kanvas PERINTAH (30x20, kanvas 329x219): printer mengecilkan semuanya 0,73x,
      * jadi lebar simbol dihitung dalam dot perintah (bukan dot cetak). x = tengah kanvas.
      */
-    private fun barcodeGeoCmd(bc: String, wCmd: Int): Pair<Int, Int> {
-        val total = if (bc.length == 13 && bc.all { it.isDigit() }) Ean13.TOTAL_MODUL
+    /** Jumlah modul (lebar simbol dasar) utk tipe barcode tertentu. */
+    private fun totalModulOf(bc: String): Int =
+        if (bc.length == 13 && bc.all { it.isDigit() }) Ean13.TOTAL_MODUL
         else (Code128.encodeCDigits(bc) ?: Code128.encodeBText(bc)).totalModul.coerceAtLeast(10)
+
+    private fun barcodeGeoCmd(bc: String, wCmd: Int): Pair<Int, Int> {
+        val total = totalModulOf(bc)
         val quiet = 10
         // Quiet zone dulu (>=10 modul), TAPI modul harus >= 0,25 mm = 2 dot cetak.
         // Di kanvas perintah (skala 0,73) itu berarti n >= ceil(0,25*8/0,73) = 3.
@@ -738,7 +750,7 @@ object EscPosLabel {
      * offset (jarak tepi label ke sisi kotak). Berlaku semua ukuran; tidak ada
      * koordinat hardcode sisa kalibrasi 25x15.
      */
-    fun buatKotakUji(widthMm: Int, heightMm: Int): ByteArray {
+    fun buatKotakUji(widthMm: Int, heightMm: Int, offsetXCmd: Int = 0, offsetYCmd: Int = 0): ByteArray {
         val (wC, hC) = kanvas(widthMm, heightMm)
         val out = ByteArrayOutputStream()
         val eol = "\r\n"
